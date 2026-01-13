@@ -1,4 +1,4 @@
-/* MMM-ScoresAndStandings.js */
+/* MMM-Scores.js */
 /* global Module */
 
 (function () {
@@ -143,7 +143,7 @@
   var MLB_MAX_GAMES_PER_PAGE = 8;
   var MLB_MAX_COLUMNS        = 2;
 
-  Module.register("MMM-ScoresAndStandings", {
+  Module.register("MMM-Scores", {
     defaults: {
       updateIntervalScores:            60 * 1000,
       scoreboardColumns:               null,
@@ -157,7 +157,6 @@
       highlightedTeams_nhl:             [],
       highlightedTeams_nfl:             [],
       highlightedTeams_nba:             [],
-      showNhlStandings:                 true,
       showTitle:                        true,
       useTimesSquareFont:               true,
 
@@ -182,7 +181,7 @@
     },
 
     getStyles: function () {
-      return ["MMM-ScoresAndStandings.css"];
+      return ["MMM-Scores.css"];
     },
 
     start: function () {
@@ -207,7 +206,6 @@
       this.totalGamePages = 1;
       this.currentScreen  = 0;
       this._scoreboardPageCount = 0;
-      this._standingsPageCount  = 0;
       this.rotateTimer    = null;
       this._headerStyleInjectedFor = null;
       this._rightPlacement = this._detectRightPlacement(false);
@@ -412,12 +410,9 @@
       var scoreboardPages = (this.games.length > 0)
         ? Math.ceil(this.games.length / this._gamesPerPage)
         : 0;
-      var standingsPages = this._countStandingsPages(league);
-
       this._scoreboardPageCount = scoreboardPages;
-      this._standingsPageCount  = standingsPages;
 
-      var totalPages = scoreboardPages + standingsPages;
+      var totalPages = scoreboardPages;
       if (totalPages === 0) totalPages = 1;
 
       this.totalGamePages = totalPages;
@@ -994,7 +989,7 @@
           this.updateDom();
         }
       } catch (e) {
-        console.error("MMM-ScoresAndStandings: socket handler error", e);
+        console.error("MMM-Scores: socket handler error", e);
       }
     },
 
@@ -1031,7 +1026,7 @@
         this._setModuleContentWidth(null);
         return this._noData("Loading games...");
       }
-      if (this.games.length === 0 && !this._hasStandingsContent()) {
+      if (this.games.length === 0) {
         this._setModuleContentWidth(null);
         return this._noData("No games to display.");
       }
@@ -1039,7 +1034,7 @@
       try {
         wrapper.appendChild(this._buildGames());
       } catch (e) {
-        console.error("MMM-ScoresAndStandings: getDom build error", e);
+        console.error("MMM-Scores: getDom build error", e);
         this._setModuleContentWidth(null);
         return this._noData("Error building view.");
       }
@@ -1077,7 +1072,6 @@
       this._setModuleContentWidth(widthPx);
 
       var scoreboardPages = this._scoreboardPageCount || 0;
-      var standingsPages = this._standingsPageCount || 0;
       var scoreboardRendered = false;
 
       if (scoreboardPages > 0 && this.currentScreen < scoreboardPages) {
@@ -1132,12 +1126,6 @@
 
         container.appendChild(matrix);
         scoreboardRendered = true;
-      } else if (standingsPages > 0) {
-        var standingsIndex = this.currentScreen - scoreboardPages;
-        if (standingsIndex < 0) standingsIndex = 0;
-        if (standingsIndex >= standingsPages) standingsIndex = standingsPages - 1;
-        var standingsView = this._buildStandingsPage(standingsIndex);
-        if (standingsView) container.appendChild(standingsView);
       }
 
       if (scoreboardRendered && activeLeague === "nfl") {
@@ -1196,10 +1184,7 @@
       if (!wrapper) return null;
       var selectors = [
         ".games-layout .games-matrix",
-        ".games-layout .standings-grid",
-        ".games-layout",
-        ".standings-page .standings-grid",
-        ".standings-page"
+        ".games-layout"
       ];
 
       for (var i = 0; i < selectors.length; i++) {
@@ -1215,368 +1200,6 @@
       return null;
     },
 
-    _buildStandingsPage: function (pageIndex) {
-      var league = this._getLeague();
-      if (!this._isStandingsEnabledForLeague(league)) return null;
-
-      var data = this._extractStandingsData(this.currentExtras, league);
-      if (!data || !Array.isArray(data.pages) || data.pages.length === 0) return null;
-      if (pageIndex < 0 || pageIndex >= data.pages.length) return null;
-
-      var page = data.pages[pageIndex];
-      if (!page || !Array.isArray(page.divisions) || page.divisions.length === 0) return null;
-
-      var wrapper = document.createElement("div");
-      wrapper.className = "standings-page";
-      wrapper.setAttribute("data-league", league);
-      if (page.key) wrapper.setAttribute("data-page", page.key);
-
-      var titleText = page.title || "";
-      if (titleText) {
-        var title = document.createElement("div");
-        title.className = "standings-title";
-        title.textContent = titleText;
-        wrapper.appendChild(title);
-      }
-
-      var grid = document.createElement("div");
-      grid.className = "standings-grid";
-      grid.setAttribute("data-league", league);
-      wrapper.appendChild(grid);
-
-      for (var d = 0; d < page.divisions.length; d++) {
-        var division = page.divisions[d];
-        if (!division || !Array.isArray(division.teams) || division.teams.length === 0) continue;
-
-        var divisionEl = document.createElement("div");
-        divisionEl.className = "standings-division";
-        if (division.name) divisionEl.setAttribute("data-division", division.name);
-        grid.appendChild(divisionEl);
-
-        var nameEl = document.createElement("div");
-        nameEl.className = "standings-division-name";
-        nameEl.textContent = division.name || "";
-        divisionEl.appendChild(nameEl);
-
-        var table = document.createElement("div");
-        table.className = "standings-table";
-        table.style.setProperty("--standings-team-count", division.teams.length);
-        divisionEl.appendChild(table);
-
-        var layout = this._standingsLayoutForLeague(league, data);
-        var statMap = layout.stats;
-        table.style.setProperty("--standings-stat-count", statMap.length);
-        var headerRow = document.createElement("div");
-        headerRow.className = "standings-row standings-row-header";
-        var headers = layout.headers;
-
-        for (var h = 0; h < headers.length; h++) {
-          var header = document.createElement("div");
-          header.className = "standings-cell standings-cell-" + headers[h].cls;
-          header.textContent = headers[h].text;
-          headerRow.appendChild(header);
-        }
-
-        table.appendChild(headerRow);
-
-        for (var t = 0; t < division.teams.length; t++) {
-          var team = division.teams[t];
-          if (!team || !team.abbr) continue;
-
-          var row = document.createElement("div");
-          row.className = "standings-row standings-row-team";
-          row.setAttribute("data-team", team.abbr);
-          if (team.name) row.title = team.name;
-
-          var highlighted = this._isHighlighted(team.abbr);
-          if (highlighted) row.classList.add("highlighted");
-
-          var teamCell = document.createElement("div");
-          teamCell.className = "standings-cell standings-cell-team";
-
-          var teamWrap = document.createElement("div");
-          teamWrap.className = "standings-team";
-
-          var logo = document.createElement("img");
-          logo.className = "standings-team-logo";
-          logo.src = this.getLogoUrl(team.abbr);
-          logo.alt = team.abbr;
-          logo.onerror = (function (imgEl) { return function () { imgEl.style.display = "none"; }; })(logo);
-          teamWrap.appendChild(logo);
-
-          var abbrEl = document.createElement("span");
-          abbrEl.className = "standings-team-abbr";
-          abbrEl.textContent = team.abbr;
-          if (highlighted) abbrEl.classList.add("team-highlight");
-          teamWrap.appendChild(abbrEl);
-
-          teamCell.appendChild(teamWrap);
-          row.appendChild(teamCell);
-
-          for (var s = 0; s < statMap.length; s++) {
-            var map = statMap[s];
-            var value = (team && Object.prototype.hasOwnProperty.call(team, map.key)) ? team[map.key] : null;
-            var formatted = (typeof map.format === "function") ? map.format(value, team) : value;
-            var cell = document.createElement("div");
-            cell.className = "standings-cell standings-cell-" + map.cls;
-            cell.textContent = (formatted == null || formatted === "") ? "-" : formatted;
-            row.appendChild(cell);
-          }
-
-          table.appendChild(row);
-        }
-      }
-
-      var updatedText = this._formatStandingsUpdated(data.updated || page.updated);
-      if (updatedText) {
-        var updatedEl = document.createElement("div");
-        updatedEl.className = "standings-updated";
-        updatedEl.textContent = updatedText;
-        wrapper.appendChild(updatedEl);
-      }
-
-      return wrapper;
-    },
-
-    _countStandingsPages: function (league) {
-      if (!this._isStandingsEnabledForLeague(league)) return 0;
-      var data = this._extractStandingsData(this.currentExtras, league);
-      if (!data || !Array.isArray(data.pages)) return 0;
-      return data.pages.length;
-    },
-
-    _hasStandingsContent: function () {
-      var league = this._getLeague();
-      if (!this._isStandingsEnabledForLeague(league)) return false;
-      var data = this._extractStandingsData(this.currentExtras, league);
-      if (!data || !Array.isArray(data.pages)) return false;
-      for (var i = 0; i < data.pages.length; i++) {
-        var page = data.pages[i];
-        if (page && Array.isArray(page.divisions) && page.divisions.length > 0) return true;
-      }
-      return false;
-    },
-
-    _extractStandingsData: function (extras, league) {
-      var store = extras || this.currentExtras;
-      if (!store || typeof store !== "object") return null;
-      var standings = store.standings;
-      if (!standings || typeof standings !== "object") return null;
-
-      var normalized = standings.normalized ? standings : null;
-      if (normalized) return normalized;
-
-      // Backwards compatibility for NHL standings payloads
-      if (!this._isStandingsEnabledForLeague("nhl")) return null;
-
-      var rawPages = Array.isArray(standings.pages) ? standings.pages : [];
-      var pages = [];
-      var toNumber = (typeof this._toNumberOrNull === "function")
-        ? this._toNumberOrNull.bind(this)
-        : function (value) {
-            var num = Number(value);
-            return Number.isFinite(num) ? num : null;
-          };
-
-      for (var p = 0; p < rawPages.length; p++) {
-        var rawPage = rawPages[p] || {};
-        var rawDivisions = Array.isArray(rawPage.divisions) ? rawPage.divisions : [];
-        var divisions = [];
-
-        for (var d = 0; d < rawDivisions.length; d++) {
-          var rawDivision = rawDivisions[d] || {};
-          var rawTeams = Array.isArray(rawDivision.teams) ? rawDivision.teams : [];
-          var teams = [];
-
-          for (var t = 0; t < rawTeams.length; t++) {
-            var rawTeam = rawTeams[t] || {};
-            var abbr = rawTeam.abbr || rawTeam.abbreviation || rawTeam.teamAbbr || rawTeam.id;
-            if (!abbr) continue;
-            var upper = String(abbr).toUpperCase();
-
-            var gamesPlayed = toNumber(rawTeam.gamesPlayed);
-            var wins = toNumber(rawTeam.wins);
-            var losses = toNumber(rawTeam.losses);
-            var ot = toNumber(rawTeam.ot);
-            var points = toNumber(rawTeam.points);
-
-            teams.push({
-              abbr: upper,
-              name: rawTeam.name || rawTeam.fullName || rawTeam.teamName || upper,
-              gamesPlayed: gamesPlayed != null ? gamesPlayed : 0,
-              wins: wins != null ? wins : 0,
-              losses: losses != null ? losses : 0,
-              ot: ot != null ? ot : 0,
-              points: points != null ? points : 0
-            });
-          }
-
-          if (teams.length > 0) {
-            divisions.push({
-              name: rawDivision.name || rawDivision.title || "",
-              teams: teams
-            });
-          }
-        }
-
-        if (divisions.length > 0) {
-          pages.push({
-            key: rawPage.key || rawPage.id || rawPage.title || rawPage.conference || "",
-            title: rawPage.title || rawPage.name || rawPage.conference || "",
-            divisions: divisions,
-            updated: rawPage.updated || rawPage.lastUpdated || null
-          });
-        }
-      }
-
-      var updated = standings.updated || standings.lastUpdated || null;
-      if (!updated && pages.length > 0) {
-        for (var idx = 0; idx < pages.length; idx++) {
-          if (pages[idx] && pages[idx].updated) {
-            updated = pages[idx].updated;
-            break;
-          }
-        }
-      }
-
-      return { pages: pages, updated: updated, normalized: true, league: "nhl" };
-    },
-
-    _isStandingsEnabledForLeague: function (league) {
-      if (!league) league = this._getLeague();
-      if (league === "nhl") {
-        var cfg = this.config || {};
-        if (!cfg || typeof cfg !== "object") return true;
-
-        var value = cfg.showNhlStandings;
-        if (value == null) return true;
-
-        if (typeof value === "string") {
-          var normalized = value.trim().toLowerCase();
-          if (normalized === "false" || normalized === "0" || normalized === "no" || normalized === "off") return false;
-          if (normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on") return true;
-        }
-
-        return !!value;
-      }
-
-      return true;
-    },
-
-    _standingsLayoutForLeague: function (league, data) {
-      var formatPct = function (value) {
-        if (value == null || value === "") return null;
-        var num = Number(value);
-        if (!isFinite(num)) return value;
-        var pct = Math.round(num * 1000) / 1000;
-        var str = pct.toFixed(3);
-        if (str.indexOf("0.") === 0) str = str.substring(1);
-        return str;
-      };
-
-      var formatNbaStreak = function (value) {
-        if (value == null) return value;
-
-        var normalize = function (val) {
-          if (typeof val === "string") {
-            var trimmed = val.trim();
-            if (!trimmed) return val;
-            if (/^[WL]/i.test(trimmed)) return trimmed.toUpperCase();
-            var parsed = Number(trimmed);
-            if (isFinite(parsed)) return parsed;
-            return trimmed;
-          }
-          return val;
-        };
-
-        var normalized = normalize(value);
-        var num = (typeof normalized === "number") ? normalized : Number(normalized);
-
-        if (isFinite(num) && num !== 0) {
-          var prefix = num > 0 ? "W" : "L";
-          return prefix + Math.abs(num);
-        }
-
-        return (typeof normalized === "string") ? normalized : value;
-      };
-
-      var layout = {
-        headers: [ { text: "TEAM", cls: "team" } ],
-        stats: []
-      };
-
-      var leagueKey = league || (data && data.league) || this._getLeague();
-
-      if (leagueKey === "nba") {
-        layout.stats = [
-          { key: "wins", cls: "w", label: "W" },
-          { key: "losses", cls: "l", label: "L" },
-          { key: "winPct", cls: "pct", label: "PCT", format: formatPct },
-          { key: "gamesBack", cls: "gb", label: "GB" },
-          { key: "streak", cls: "strk", label: "STRK", format: formatNbaStreak }
-        ];
-      } else if (leagueKey === "nfl") {
-        layout.stats = [
-          { key: "wins", cls: "w", label: "W" },
-          { key: "losses", cls: "l", label: "L" },
-          { key: "ties", cls: "t", label: "T" },
-          { key: "winPct", cls: "pct", label: "PCT", format: formatPct }
-        ];
-      } else if (leagueKey === "mlb") {
-        layout.stats = [
-          { key: "wins", cls: "w", label: "W" },
-          { key: "losses", cls: "l", label: "L" },
-          { key: "winPct", cls: "pct", label: "PCT", format: formatPct },
-          { key: "gamesBack", cls: "gb", label: "GB" },
-          { key: "streak", cls: "strk", label: "STRK" }
-        ];
-      } else {
-        layout.stats = [
-          { key: "gamesPlayed", cls: "gp", label: "GP" },
-          { key: "wins", cls: "w", label: "W" },
-          { key: "losses", cls: "l", label: "L" },
-          { key: "ot", cls: "ot", label: "OT" },
-          { key: "points", cls: "pts", label: "PTS" }
-        ];
-      }
-
-      layout.headers = [ { text: "TEAM", cls: "team" } ].concat(layout.stats.map(function (s) {
-        return { text: s.label, cls: s.cls };
-      }));
-
-      return layout;
-    },
-
-    _formatStandingsUpdated: function (value) {
-      if (!value) return null;
-
-      var formatted = null;
-      if (typeof moment === "function") {
-        try {
-          var m;
-          if (moment.tz && this.config && this.config.timeZone) {
-            m = moment.tz(value, this.config.timeZone);
-          } else {
-            m = moment(value);
-          }
-          if (m && typeof m.isValid === "function" && m.isValid()) {
-            formatted = m.format("MMM D, h:mm A");
-          }
-        } catch (e) {
-          formatted = null;
-        }
-      }
-
-      if (!formatted) {
-        var date = new Date(value);
-        if (!isNaN(date.getTime())) {
-          formatted = date.toLocaleString();
-        }
-      }
-
-      if (!formatted) return null;
-      return "Updated " + formatted;
-    },
 
     _buildNflByeSection: function (byeTeams) {
       if (!Array.isArray(byeTeams) || byeTeams.length === 0) return null;

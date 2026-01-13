@@ -16,7 +16,7 @@ const DNS_LOOKUP = (dns && dns.promises && typeof dns.promises.lookup === "funct
 
 module.exports = NodeHelper.create({
   start() {
-    console.log("🛰️ MMM-ScoresAndStandings helper started");
+    console.log("🛰️ MMM-Scores helper started");
     this.fetchTimer = null;
     this._nhlStatsDnsStatus = { available: null, checkedAt: 0 };
   },
@@ -68,18 +68,8 @@ module.exports = NodeHelper.create({
       const json = await res.json();
       const games = (json.dates && json.dates[0] && json.dates[0].games) || [];
 
-      let extras = null;
-      try {
-        const standings = await this._fetchMlbStandings();
-        if (standings && Array.isArray(standings.pages) && standings.pages.length > 0) {
-          extras = { standings };
-        }
-      } catch (standingsErr) {
-        console.error("🚨 MLB standings fetch failed:", standingsErr);
-      }
-
       console.log(`⚾️ Sending ${games.length} MLB games to front-end.`);
-      this._notifyGames("mlb", games, extras);
+      this._notifyGames("mlb", games);
     } catch (e) {
       console.error("🚨 MLB fetchGames failed:", e);
     }
@@ -89,11 +79,6 @@ module.exports = NodeHelper.create({
     const { dateIso } = this._getTargetDate();
     const scoreboardDateIso = this._getNhlScoreboardDate();
     const targetDate = scoreboardDateIso || dateIso;
-
-    const includeStandings = this._shouldIncludeNhlStandings();
-    const extrasPromise = includeStandings
-      ? this._fetchNhlStandingsExtras()
-      : Promise.resolve(null);
 
     let delivered = false;
     let sent = false;
@@ -111,8 +96,7 @@ module.exports = NodeHelper.create({
         const games = Array.isArray(statsGames) ? statsGames : [];
         const count = games.length;
 
-        const extras = await extrasPromise;
-        this._notifyGames("nhl", games, extras);
+        this._notifyGames("nhl", games);
         sent = true;
 
         if (count > 0) {
@@ -135,8 +119,7 @@ module.exports = NodeHelper.create({
         const games = Array.isArray(scoreboardGames) ? scoreboardGames : [];
         const count = games.length;
 
-        const extras = await extrasPromise;
-        this._notifyGames("nhl", games, extras);
+        this._notifyGames("nhl", games);
         sent = true;
 
         if (count > 0) {
@@ -156,8 +139,7 @@ module.exports = NodeHelper.create({
         const restGames = await this._fetchNhlStatsRestGames(targetDate);
         if (restGames.length > 0) {
           console.log(`🏒 Sending ${restGames.length} NHL games to front-end (stats REST fallback).`);
-          const extras = await extrasPromise;
-          this._notifyGames("nhl", restGames, extras);
+          this._notifyGames("nhl", restGames);
           delivered = true;
           sent = true;
         } else {
@@ -170,8 +152,7 @@ module.exports = NodeHelper.create({
 
     if (!delivered && !sent) {
       console.warn(`⚠️ Unable to fetch NHL games for ${targetDate}; sending empty schedule to front-end.`);
-      const extras = await extrasPromise;
-      this._notifyGames("nhl", [], extras);
+      this._notifyGames("nhl", []);
     }
   },
 
@@ -392,7 +373,7 @@ module.exports = NodeHelper.create({
 
   _nhlRequestHeaders(extra) {
     const base = {
-      "User-Agent": "Mozilla/5.0 (MMM-ScoresAndStandings)",
+      "User-Agent": "Mozilla/5.0 (MMM-Scores)",
       Accept: "application/json",
       "Accept-Language": "en-US,en;q=0.9",
       Referer: "https://www.nhl.com/",
@@ -461,181 +442,6 @@ module.exports = NodeHelper.create({
     return hydrated;
   },
 
-  _shouldIncludeNhlStandings() {
-    const cfg = this.config || {};
-    if (!cfg || typeof cfg !== "object") return true;
-
-    const value = cfg.showNhlStandings;
-    if (value == null) return true;
-
-    if (typeof value === "string") {
-      const normalized = value.trim().toLowerCase();
-      if (normalized === "false" || normalized === "0" || normalized === "no" || normalized === "off") return false;
-      if (normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on") return true;
-    }
-
-    return !!value;
-  },
-
-  async _fetchNhlStandingsExtras() {
-    try {
-      const standings = await this._fetchNhlStandings();
-      if (standings && Array.isArray(standings.pages) && standings.pages.length > 0) {
-        return { standings };
-      }
-    } catch (err) {
-      console.error("🚨 NHL standings fetch failed:", err);
-    }
-    return null;
-  },
-
-  async _fetchNhlStandings() {
-    const url = "https://statsapi.web.nhl.com/api/v1/standings/byDivision";
-    const res = await fetch(url, { headers: this._nhlRequestHeaders() });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status} ${res.statusText}`);
-    }
-
-    const json = await res.json();
-    const records = Array.isArray(json.records) ? json.records : [];
-
-    const divisions = {};
-
-    const addDivision = (key, division) => {
-      if (!key) return;
-      const normalizedKey = key.toLowerCase();
-      divisions[normalizedKey] = division;
-    };
-
-    const resolveAbbr = (teamInfo = {}) => {
-      const abbr = teamInfo.abbreviation || teamInfo.teamAbbrev || teamInfo.teamName || teamInfo.shortName || teamInfo.locationName;
-      return abbr ? String(abbr).toUpperCase() : null;
-    };
-
-    const resolveName = (teamInfo = {}) => {
-      if (teamInfo.name) return teamInfo.name;
-      const parts = [teamInfo.locationName, teamInfo.teamName].filter(Boolean);
-      if (parts.length > 0) return parts.join(" ");
-      if (teamInfo.shortName) return teamInfo.shortName;
-      if (teamInfo.abbreviation) return teamInfo.abbreviation;
-      return "";
-    };
-
-    for (let i = 0; i < records.length; i += 1) {
-      const record = records[i] || {};
-      const divisionInfo = record.division || {};
-      const conferenceInfo = record.conference || {};
-
-      const divisionName = divisionInfo.nameShort || divisionInfo.name || record.divisionName || "";
-      const conferenceName = conferenceInfo.name || conferenceInfo.nameShort || record.conferenceName || "";
-
-      const keyCandidates = [divisionName, divisionInfo.name, divisionInfo.nameShort, divisionInfo.abbreviation, divisionInfo.id];
-      const candidateKeys = keyCandidates
-        .filter((candidate) => candidate != null && String(candidate).trim() !== "")
-        .map((candidate) => String(candidate));
-      if (candidateKeys.length === 0) continue;
-
-      const teamRecords = Array.isArray(record.teamRecords) ? record.teamRecords : [];
-      const teams = [];
-
-      for (let j = 0; j < teamRecords.length; j += 1) {
-        const teamRecord = teamRecords[j] || {};
-        const teamInfo = teamRecord.team || {};
-        const leagueRecord = teamRecord.leagueRecord || {};
-
-        const abbr = resolveAbbr(teamInfo);
-        if (!abbr) continue;
-
-        const wins = Number.isFinite(leagueRecord.wins) ? leagueRecord.wins : Number(teamRecord.wins) || 0;
-        const losses = Number.isFinite(leagueRecord.losses) ? leagueRecord.losses : Number(teamRecord.losses) || 0;
-        const overtime = Number.isFinite(leagueRecord.ot) ? leagueRecord.ot : Number(teamRecord.ot) || Number(teamRecord.overtimeLosses) || 0;
-        const gamesPlayed = Number(teamRecord.gamesPlayed) || (wins + losses + overtime);
-        const points = Number(teamRecord.points) || 0;
-        const regulationWins = Number(teamRecord.regulationWins) || 0;
-        const pointsPct = Number(teamRecord.pointsPercentage) || 0;
-
-        teams.push({
-          id: teamInfo.id,
-          name: resolveName(teamInfo),
-          abbr,
-          gamesPlayed,
-          wins,
-          losses,
-          ot: overtime,
-          points,
-          regulationWins,
-          pointsPercentage: pointsPct
-        });
-      }
-
-      teams.sort((a, b) => {
-        if (b.points !== a.points) return b.points - a.points;
-        if (b.regulationWins !== a.regulationWins) return b.regulationWins - a.regulationWins;
-        if (b.wins !== a.wins) return b.wins - a.wins;
-        if (b.pointsPercentage !== a.pointsPercentage) return b.pointsPercentage - a.pointsPercentage;
-        return a.name.localeCompare(b.name);
-      });
-
-      const divisionData = {
-        name: divisionName || candidateKeys[0],
-        conference: conferenceName || null,
-        teams
-      };
-
-      candidateKeys.forEach((key) => addDivision(key, divisionData));
-    }
-
-    const buildDivisions = (names) => {
-      const result = [];
-      names.forEach((name) => {
-        if (!name) return;
-        const key = String(name).toLowerCase();
-        const division = divisions[key];
-        if (division && Array.isArray(division.teams) && division.teams.length > 0) {
-          result.push({
-            name: division.name,
-            teams: division.teams.map((team) => ({
-              abbr: team.abbr,
-              name: team.name,
-              gamesPlayed: team.gamesPlayed,
-              wins: team.wins,
-              losses: team.losses,
-              ot: team.ot,
-              points: team.points
-            }))
-          });
-        }
-      });
-      return result;
-    };
-
-    const pages = [];
-    const western = buildDivisions(["Central", "Pacific"]);
-    if (western.length > 0) {
-      pages.push({ key: "western", title: "Western Conference", divisions: western });
-    }
-
-    const eastern = buildDivisions(["Metropolitan", "Atlantic"]);
-    if (eastern.length > 0) {
-      pages.push({ key: "eastern", title: "Eastern Conference", divisions: eastern });
-    }
-
-    let updated = null;
-    for (let i = 0; i < records.length; i += 1) {
-      const record = records[i];
-      if (record && record.lastUpdated) {
-        updated = record.lastUpdated;
-        break;
-      }
-    }
-    if (!updated && json && json.records && json.records[0] && json.records[0].teamRecords && json.records[0].teamRecords[0]) {
-      const firstRecord = json.records[0].teamRecords[0];
-      if (firstRecord && firstRecord.lastUpdated) updated = firstRecord.lastUpdated;
-    }
-    if (!updated && json && json.lastUpdated) updated = json.lastUpdated;
-
-    return { pages, updated, league: "nhl", normalized: true };
-  },
 
   _hydrateNhlGame(game) {
     if (!game || typeof game !== "object") return null;
@@ -1163,18 +969,8 @@ module.exports = NodeHelper.create({
         return 0;
       });
 
-      let extras = null;
-      try {
-        const standings = await this._fetchNbaStandings();
-        if (standings && Array.isArray(standings.pages) && standings.pages.length > 0) {
-          extras = { standings };
-        }
-      } catch (standingsErr) {
-        console.error("🚨 NBA standings fetch failed:", standingsErr);
-      }
-
       console.log(`🏀 Sending ${events.length} NBA games for ${dateIso} to front-end.`);
-      this._notifyGames("nba", events, extras);
+      this._notifyGames("nba", events);
     } catch (e) {
       console.error("🚨 NBA fetchGames failed:", e);
     }
@@ -1243,15 +1039,7 @@ module.exports = NodeHelper.create({
       const byeList = Array.from(byeTeams.values());
       byeList.sort((a, b) => a.abbreviation.localeCompare(b.abbreviation));
 
-      let extras = { teamsOnBye: byeList };
-      try {
-        const standings = await this._fetchNflStandings();
-        if (standings && Array.isArray(standings.pages) && standings.pages.length > 0) {
-          extras.standings = standings;
-        }
-      } catch (standingsErr) {
-        console.error("🚨 NFL standings fetch failed:", standingsErr);
-      }
+      const extras = { teamsOnBye: byeList };
 
       console.log(`🏈 Sending ${games.length} NFL games (${startIso} → ${endIso}) to front-end.${byeList.length ? ` ${byeList.length} teams on bye.` : ""}`);
       this._notifyGames("nfl", games, extras);
@@ -1260,223 +1048,6 @@ module.exports = NodeHelper.create({
     }
   },
 
-  async _fetchMlbStandings() {
-    const { dateIso } = this._getTargetDate();
-    const season = new Date(dateIso).getFullYear();
-    const url = `https://statsapi.mlb.com/api/v1/standings?leagueId=103,104&season=${season}&standingsTypes=regularSeason`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-    const json = await res.json();
-    const records = Array.isArray(json.records) ? json.records : [];
-    const byLeague = new Map();
-
-    records.forEach((record) => {
-      if (!record || !record.division || !record.teamRecords) return;
-      const leagueName = (record.league && (record.league.nameShort || record.league.name)) || "";
-      if (!leagueName) return;
-      const divisionName = record.division && (record.division.nameShort || record.division.name || record.division.id);
-      const divisionKey = divisionName || "";
-      if (!divisionKey) return;
-
-      const leagueKey = leagueName.toUpperCase().indexOf("NATIONAL") >= 0 ? "nl" : "al";
-      if (!byLeague.has(leagueKey)) byLeague.set(leagueKey, []);
-
-      const teams = (record.teamRecords || []).map((teamRecord) => {
-        const team = teamRecord.team || {};
-        const abbr = (team.abbreviation || team.teamAbbrev || team.teamCode || "").toUpperCase();
-        return {
-          abbr,
-          name: team.name || team.teamName || team.clubName || abbr,
-          wins: Number(teamRecord.wins) || 0,
-          losses: Number(teamRecord.losses) || 0,
-          gamesBack: teamRecord.gamesBack === "-" ? "—" : (teamRecord.gamesBack || "—"),
-          winPct: Number(teamRecord.winningPercentage || teamRecord.winPct || 0),
-          streak: (teamRecord.streak && teamRecord.streak.streakCode) || ""
-        };
-      });
-
-      teams.sort((a, b) => b.winPct - a.winPct || b.wins - a.wins);
-
-      byLeague.get(leagueKey).push({
-        name: divisionName,
-        teams
-      });
-    });
-
-    const pages = [];
-    if (byLeague.has("al")) pages.push({ key: "al", title: "American League", divisions: byLeague.get("al") });
-    if (byLeague.has("nl")) pages.push({ key: "nl", title: "National League", divisions: byLeague.get("nl") });
-
-    return { league: "mlb", pages, updated: json.lastUpdated || null, normalized: true };
-  },
-
-  async _fetchNbaStandings() {
-    const cdnUrl = "https://cdn.nba.com/static/json/liveData/standings/league.json";
-    try {
-      return await this._fetchNbaStandingsFromCdn(cdnUrl);
-    } catch (cdnErr) {
-      console.warn("⚠️ NBA CDN standings failed, attempting ESPN fallback:", cdnErr.message || cdnErr);
-    }
-
-    return this._fetchNbaStandingsFromEspn();
-  },
-
-  _normalizeNbaTeam(team = {}) {
-    const abbr = (team.teamTricode || team.tricode || team.teamAbbreviation || team.abbreviation || "").toUpperCase();
-    const name = team.teamName || team.fullName || team.displayName || team.name || abbr;
-    const gbRaw = team.gamesBehind || team.gamesBack || team.gamesBackNumeric || "";
-    const gamesBack = (gbRaw === 0 || gbRaw === "0") ? "—" : gbRaw;
-    return {
-      abbr,
-      name,
-      wins: Number(team.win) || Number(team.wins) || 0,
-      losses: Number(team.loss) || Number(team.losses) || 0,
-      winPct: Number(team.winPct) || Number(team.winPercent) || Number(team.winPercentage) || 0,
-      gamesBack,
-      streak: team.streakText || team.streak || ""
-    };
-  },
-
-  async _fetchNbaStandingsFromCdn(url) {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    const standard = json && json.league && json.league.standard;
-    if (!standard || !standard.conferences) throw new Error("Malformed NBA CDN payload");
-
-    const buildConference = (confKey, title) => {
-      const conf = standard.conferences && standard.conferences[confKey];
-      const teams = conf && Array.isArray(conf.teams) ? conf.teams : [];
-      const mapped = teams.map((team) => this._normalizeNbaTeam(team));
-      mapped.sort((a, b) => b.winPct - a.winPct || b.wins - a.wins);
-      return { key: confKey, title, divisions: [ { name: title, teams: mapped } ] };
-    };
-
-    const pages = [];
-    pages.push(buildConference("east", "Eastern Conference"));
-    pages.push(buildConference("west", "Western Conference"));
-
-    return { league: "nba", pages, updated: standard.seasonYear || null, normalized: true };
-  },
-
-  async _fetchNbaStandingsFromEspn() {
-    const url = "https://site.web.api.espn.com/apis/v2/sports/basketball/nba/standings";
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    const groups = Array.isArray(json.children) ? json.children : [];
-
-    const pages = [];
-
-    groups.forEach((group) => {
-      const rawName = (group.name || group.abbreviation || group.id || "").trim();
-      const baseName = rawName.replace(/\s*conference$/i, "").trim();
-      const name = baseName || rawName || "";
-      const entries = (group.standings && group.standings.entries) || [];
-      const teams = entries.map((entry) => {
-        const team = entry.team || {};
-        const stats = Array.isArray(entry.stats) ? entry.stats : [];
-        const statValue = (abbr) => {
-          const stat = stats.find((s) => s.abbreviation === abbr || s.name === abbr);
-          return stat ? stat.value || stat.displayValue || 0 : 0;
-        };
-
-        return {
-          abbr: (team.abbreviation || team.shortDisplayName || "").toUpperCase(),
-          name: team.displayName || team.name || team.shortDisplayName || team.location || "",
-          wins: Number(statValue("wins")) || 0,
-          losses: Number(statValue("losses")) || 0,
-          winPct: Number(statValue("winPercent")) || 0,
-          gamesBack: statValue("gamesBehind") || "",
-          streak: statValue("streak") || ""
-        };
-      });
-
-      teams.sort((a, b) => b.winPct - a.winPct || b.wins - a.wins);
-      const conferenceTitle = `${name} Conference`;
-      pages.push({ key: name || conferenceTitle, title: conferenceTitle, divisions: [ { name: conferenceTitle, teams } ] });
-    });
-
-    return { league: "nba", pages, updated: json.season && json.season.year, normalized: true };
-  },
-
-  async _fetchNflStandings() {
-    const url = "https://raw.githubusercontent.com/nflverse/nfldata/master/data/standings.csv";
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const csvText = await res.text();
-
-    const lines = csvText.split(/\r?\n/);
-    const header = lines.shift();
-    if (!header) return null;
-    const columns = header.split(",");
-    const idx = (name) => columns.indexOf(name);
-    const seasonIdx = idx("season");
-    const divisionIdx = idx("division");
-    const teamIdx = idx("team");
-    const winsIdx = idx("wins");
-    const lossesIdx = idx("losses");
-    const tiesIdx = idx("ties");
-    const pctIdx = idx("pct");
-
-    const latestByTeam = new Map();
-
-    lines.forEach((line) => {
-      if (!line.trim()) return;
-      const parts = line.split(",");
-      const season = Number(parts[seasonIdx]);
-      const team = parts[teamIdx];
-      const division = parts[divisionIdx];
-      if (!team || !division || !Number.isFinite(season)) return;
-
-      const wins = Number(parts[winsIdx]) || 0;
-      const losses = Number(parts[lossesIdx]) || 0;
-      const ties = Number(parts[tiesIdx]) || 0;
-      const games = wins + losses + ties;
-      const computedPct = games > 0 ? (wins + (ties * 0.5)) / games : 0;
-      const pct = Number.isFinite(computedPct) ? computedPct : 0;
-
-      const existing = latestByTeam.get(team);
-      if (existing && existing.season > season) return;
-
-      latestByTeam.set(team, {
-        season,
-        division,
-        abbr: team.toUpperCase(),
-        name: team.toUpperCase(),
-        wins,
-        losses,
-        ties,
-        winPct: pct
-      });
-    });
-
-    const divisions = new Map();
-    latestByTeam.forEach((team) => {
-      const list = divisions.get(team.division) || [];
-      list.push(team);
-      divisions.set(team.division, list);
-    });
-
-    const buildConference = (name) => {
-      const confDivisions = [];
-      divisions.forEach((teams, divisionName) => {
-        if (!divisionName || divisionName.indexOf(name) !== 0) return;
-        teams.sort((a, b) => b.winPct - a.winPct || b.wins - a.wins);
-        confDivisions.push({ name: divisionName, teams });
-      });
-      return confDivisions;
-    };
-
-    const pages = [];
-    const afc = buildConference("AFC");
-    if (afc.length > 0) pages.push({ key: "afc", title: "AFC", divisions: afc });
-    const nfc = buildConference("NFC");
-    if (nfc.length > 0) pages.push({ key: "nfc", title: "NFC", divisions: nfc });
-
-    return { league: "nfl", pages, updated: null, normalized: true };
-  },
 
   _firstDate(...values) {
     for (let i = 0; i < values.length; i += 1) {
