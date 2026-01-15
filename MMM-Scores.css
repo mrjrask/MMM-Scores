@@ -165,8 +165,10 @@
 
 .bye-week-team-logo {
   height: calc(var(--scoreboard-team-font) * 0.952);
-  width: auto;
+  width: calc(var(--scoreboard-team-font) * 1.2);
+  object-fit: contain;
   display: block;
+  flex-shrink: 0;
 }
 
 .bye-week-team-text {
@@ -327,8 +329,10 @@
 .scoreboard-card .scoreboard-team-logo {
   height: calc(var(--scoreboard-team-font) * 0.9856);
   max-height: calc(var(--scoreboard-team-font) * 1.1088);
-  width: auto;
+  width: calc(var(--scoreboard-team-font) * 1.2);
+  object-fit: contain;
   display: block;
+  flex-shrink: 0;
 }
 
 .scoreboard-card .scoreboard-team-logo[src*="/SD.png"],
@@ -358,6 +362,7 @@
   text-transform: uppercase;
   line-height: 1;
   font-weight: 600;
+  text-align: left;
 }
 
 .scoreboard-card .scoreboard-possession-icon {
