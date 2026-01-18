@@ -315,7 +315,6 @@
   font-weight: 700;
   color: var(--scoreboard-text);
   margin-left: auto;
-  text-align: right;
   line-height: 1;
 }
 
@@ -376,8 +375,7 @@
 
 .scoreboard-card .scoreboard-value {
   font-size: calc(var(--scoreboard-value-font) + 1pt);
-  text-align: right;
-  justify-self: end;
+  text-align: center;
   font-variant-numeric: tabular-nums;
   color: var(--scoreboard-text);
   line-height: 1;
