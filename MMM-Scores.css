@@ -363,10 +363,15 @@
   line-height: 1;
   font-weight: 600;
   text-align: left;
+  position: relative;
 }
 
-.scoreboard-card .scoreboard-possession-icon {
-  margin: 0 0.2em;
+.scoreboard-card .scoreboard-team-abbr .scoreboard-possession-icon {
+  position: absolute;
+  top: 50%;
+  left: 100%;
+  transform: translate(0.2em, -50%);
+  margin: 0;
   font-size: calc((var(--scoreboard-team-font) + 1pt) * 0.3);
   line-height: 1;
   display: inline-block;

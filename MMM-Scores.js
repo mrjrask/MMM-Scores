@@ -1374,7 +1374,7 @@
           var possessionEl = document.createElement("span");
           possessionEl.className = "scoreboard-possession-icon";
           possessionEl.textContent = rowData.possessionIcon;
-          team.appendChild(possessionEl);
+          abbrEl.appendChild(possessionEl);
         }
 
         if (rowData.record) {
