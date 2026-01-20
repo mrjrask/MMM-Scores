@@ -2270,6 +2270,14 @@
         return "Halftime";
       }
 
+      if (clock.indexOf("end of 1st") !== -1 || detailed.indexOf("end of 1st") !== -1) {
+        return "End of 1st";
+      }
+
+      if (clock.indexOf("end of 3rd") !== -1 || detailed.indexOf("end of 3rd") !== -1) {
+        return "End of 3rd";
+      }
+
       return null;
     },
 
