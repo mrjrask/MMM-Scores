@@ -978,44 +978,16 @@ module.exports = NodeHelper.create({
 
   async _fetchNflGames() {
     try {
-      const {
-        startIso,
-        endIso,
-        dateIsos
-      } = this._getNflWeekDateRange();
+      const weekRange = this._getNflWeekDateRange();
+      let results = await this._fetchNflWeekGames(weekRange.dateIsos);
 
-      const aggregated = new Map();
-      const byeTeams = new Map();
-
-      for (let i = 0; i < dateIsos.length; i += 1) {
-        const dateIso = dateIsos[i];
-        const dateCompact = dateIso.replace(/-/g, "");
-        const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${dateCompact}`;
-
-        try {
-          const res = await fetch(url);
-          const json = await res.json();
-          const events = Array.isArray(json.events) ? json.events : [];
-          const week = json && json.week;
-          const teamsOnBye = week && Array.isArray(week.teamsOnBye) ? week.teamsOnBye : [];
-
-          for (let j = 0; j < events.length; j += 1) {
-            const event = events[j];
-            if (!event) continue;
-            const key = event.id || event.uid || `${dateIso}-${j}`;
-            if (!aggregated.has(key)) aggregated.set(key, event);
-          }
-
-          for (let b = 0; b < teamsOnBye.length; b += 1) {
-            const bye = this._normalizeNflByeTeam(teamsOnBye[b]);
-            if (bye) byeTeams.set(bye.abbreviation, bye);
-          }
-        } catch (err) {
-          console.error(`🚨 NFL fetchGames failed for ${dateIso}:`, err);
-        }
+      if (this._shouldAdvanceNflPlayoffWeek(results.games.length)) {
+        const nextWeekRange = this._getNflWeekDateRange(1);
+        results = await this._fetchNflWeekGames(nextWeekRange.dateIsos);
+        results.range = nextWeekRange;
       }
 
-      const games = Array.from(aggregated.values());
+      const games = results.games;
       games.sort((a, b) => {
         const dateA = this._firstDate(
           a && a.date,
@@ -1036,16 +1008,96 @@ module.exports = NodeHelper.create({
         return 0;
       });
 
-      const byeList = Array.from(byeTeams.values());
-      byeList.sort((a, b) => a.abbreviation.localeCompare(b.abbreviation));
+      const byeList = results.byes;
+      const range = results.range || weekRange;
 
       const extras = { teamsOnBye: byeList };
 
-      console.log(`🏈 Sending ${games.length} NFL games (${startIso} → ${endIso}) to front-end.${byeList.length ? ` ${byeList.length} teams on bye.` : ""}`);
+      console.log(`🏈 Sending ${games.length} NFL games (${range.startIso} → ${range.endIso}) to front-end.${byeList.length ? ` ${byeList.length} teams on bye.` : ""}`);
       this._notifyGames("nfl", games, extras);
     } catch (e) {
       console.error("🚨 NFL fetchGames failed:", e);
     }
+  },
+
+  async _fetchNflWeekGames(dateIsos) {
+    const aggregated = new Map();
+    const byeTeams = new Map();
+
+    for (let i = 0; i < dateIsos.length; i += 1) {
+      const dateIso = dateIsos[i];
+      const dateCompact = dateIso.replace(/-/g, "");
+      const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${dateCompact}`;
+
+      try {
+        const res = await fetch(url);
+        const json = await res.json();
+        const events = Array.isArray(json.events) ? json.events : [];
+        const week = json && json.week;
+        const teamsOnBye = week && Array.isArray(week.teamsOnBye) ? week.teamsOnBye : [];
+
+        for (let j = 0; j < events.length; j += 1) {
+          const event = events[j];
+          if (!event) continue;
+          const key = event.id || event.uid || `${dateIso}-${j}`;
+          if (!aggregated.has(key)) aggregated.set(key, event);
+        }
+
+        for (let b = 0; b < teamsOnBye.length; b += 1) {
+          const bye = this._normalizeNflByeTeam(teamsOnBye[b]);
+          if (bye) byeTeams.set(bye.abbreviation, bye);
+        }
+      } catch (err) {
+        console.error(`🚨 NFL fetchGames failed for ${dateIso}:`, err);
+      }
+    }
+
+    const games = Array.from(aggregated.values());
+    const byeList = Array.from(byeTeams.values());
+    byeList.sort((a, b) => a.abbreviation.localeCompare(b.abbreviation));
+
+    return {
+      games,
+      byes: byeList
+    };
+  },
+
+  _shouldAdvanceNflPlayoffWeek(gameCount) {
+    const tz = this.config && this.config.timeZone ? this.config.timeZone : "America/Chicago";
+    const now = new Date();
+    const dateIso = now.toLocaleDateString("en-CA", { timeZone: tz });
+    const [, monthStr] = dateIso.split("-");
+    const month = parseInt(monthStr, 10);
+
+    if (month !== 1 && month !== 2) {
+      return false;
+    }
+
+    if (![6, 4, 2].includes(gameCount)) {
+      return false;
+    }
+
+    const timeStr = now.toLocaleTimeString("en-GB", {
+      timeZone: tz,
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+    const [hStr, mStr] = timeStr.split(":");
+    const hour = parseInt(hStr, 10);
+    const minute = parseInt(mStr, 10);
+    const minutes = (Number.isFinite(hour) ? hour : 0) * 60 + (Number.isFinite(minute) ? minute : 0);
+
+    const localMidnight = new Date(`${dateIso}T00:00:00Z`);
+    const dayOfWeek = localMidnight.getUTCDay();
+
+    if (gameCount === 6) {
+      if (dayOfWeek > 2) return true;
+      return dayOfWeek === 2 && minutes >= (15 * 60);
+    }
+
+    if (dayOfWeek > 1) return true;
+    return dayOfWeek === 1 && minutes >= ((15 * 60) + 15);
   },
 
 
@@ -1210,7 +1262,7 @@ module.exports = NodeHelper.create({
     return dateIso;
   },
 
-  _getNflWeekDateRange() {
+  _getNflWeekDateRange(weekOffset = 0) {
     const tz = this.config && this.config.timeZone ? this.config.timeZone : "America/Chicago";
     const now = new Date();
 
@@ -1235,6 +1287,10 @@ module.exports = NodeHelper.create({
     const minutes = (Number.isFinite(hour) ? hour : 0) * 60 + (Number.isFinite(minute) ? minute : 0);
     if (dayOfWeek === 3 && minutes >= (9 * 60)) {
       weekStart.setUTCDate(weekStart.getUTCDate() + 7);
+    }
+
+    if (Number.isFinite(weekOffset) && weekOffset !== 0) {
+      weekStart.setUTCDate(weekStart.getUTCDate() + (weekOffset * 7));
     }
 
     const weekEnd = new Date(weekStart);
