@@ -19,8 +19,6 @@
   --scoreboard-value-font-base:       32px;
   --scoreboard-metric-width-base:     56px;
   --scoreboard-placeholder-height-base: calc(184px * 0.9);
-  --scoreboard-header-min-height-base: 38px;
-  --scoreboard-row-min-height-base:    52px;
 
   --scoreboard-card-width:    calc(var(--scoreboard-card-width-base) * var(--box-scale));
   --scoreboard-height-scale:  0.9;
@@ -33,8 +31,6 @@
   --scoreboard-value-font:    calc((var(--scoreboard-value-font-base) + 2pt) * var(--box-scale) * var(--scoreboard-height-scale));
   --scoreboard-metric-width:  calc(var(--scoreboard-metric-width-base) * var(--box-scale));
   --scoreboard-placeholder-height: calc(var(--scoreboard-placeholder-height-base) * var(--box-scale) * var(--scoreboard-height-scale));
-  --scoreboard-header-min-height: calc(var(--scoreboard-header-min-height-base) * var(--box-scale) * var(--scoreboard-height-scale));
-  --scoreboard-row-min-height: calc(var(--scoreboard-row-min-height-base) * var(--box-scale) * var(--scoreboard-height-scale));
   --scoreboard-font-family: 'Times Square', Arial, sans-serif;
 
   --scoreboard-border-color: #4c4c4c;
@@ -240,7 +236,6 @@
 .scoreboard-card .scoreboard-header {
   background: var(--scoreboard-header-bg);
   padding: var(--scoreboard-pad-block) var(--scoreboard-pad-inline);
-  min-height: var(--scoreboard-header-min-height);
 }
 
 .scoreboard-card .scoreboard-status {
@@ -306,7 +301,6 @@
 
 .scoreboard-card .scoreboard-row {
   padding: var(--scoreboard-pad-block) var(--scoreboard-pad-inline);
-  min-height: var(--scoreboard-row-min-height);
 }
 
 .scoreboard-card .scoreboard-row + .scoreboard-row {
