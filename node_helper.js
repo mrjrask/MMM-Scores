@@ -981,6 +981,14 @@ module.exports = NodeHelper.create({
       const weekRange = this._getNflWeekDateRange();
       let results = await this._fetchNflWeekGames(weekRange.dateIsos);
 
+      if (results.games.length === 0) {
+        const fallbackResults = await this._fetchNflDefaultWeekGames();
+        if (fallbackResults.games.length > 0) {
+          console.info("ℹ️ NFL date-range fetch returned no games; using default scoreboard feed.");
+          results = fallbackResults;
+        }
+      }
+
       if (this._shouldAdvanceNflPlayoffWeek(results.games.length)) {
         const nextWeekRange = this._getNflWeekDateRange(1);
         results = await this._fetchNflWeekGames(nextWeekRange.dateIsos);
@@ -1032,26 +1040,51 @@ module.exports = NodeHelper.create({
       try {
         const res = await fetch(url);
         const json = await res.json();
-        const events = Array.isArray(json.events) ? json.events : [];
-        const week = json && json.week;
-        const teamsOnBye = week && Array.isArray(week.teamsOnBye) ? week.teamsOnBye : [];
-
-        for (let j = 0; j < events.length; j += 1) {
-          const event = events[j];
-          if (!event) continue;
-          const key = event.id || event.uid || `${dateIso}-${j}`;
-          if (!aggregated.has(key)) aggregated.set(key, event);
-        }
-
-        for (let b = 0; b < teamsOnBye.length; b += 1) {
-          const bye = this._normalizeNflByeTeam(teamsOnBye[b]);
-          if (bye) byeTeams.set(bye.abbreviation, bye);
-        }
+        this._mergeNflScoreboardResponse(json, aggregated, byeTeams, dateIso);
       } catch (err) {
         console.error(`🚨 NFL fetchGames failed for ${dateIso}:`, err);
       }
     }
 
+    return this._finalizeNflWeekResults(aggregated, byeTeams);
+  },
+
+  async _fetchNflDefaultWeekGames() {
+    const aggregated = new Map();
+    const byeTeams = new Map();
+    const url = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
+
+    try {
+      const res = await fetch(url);
+      const json = await res.json();
+      this._mergeNflScoreboardResponse(json, aggregated, byeTeams, "current");
+    } catch (err) {
+      console.error("🚨 NFL fallback scoreboard fetch failed:", err);
+    }
+
+    return this._finalizeNflWeekResults(aggregated, byeTeams);
+  },
+
+  _mergeNflScoreboardResponse(json, aggregated, byeTeams, keyPrefix) {
+    if (!json || typeof json !== "object") return;
+    const events = Array.isArray(json.events) ? json.events : [];
+    const week = json && json.week;
+    const teamsOnBye = week && Array.isArray(week.teamsOnBye) ? week.teamsOnBye : [];
+
+    for (let j = 0; j < events.length; j += 1) {
+      const event = events[j];
+      if (!event) continue;
+      const key = event.id || event.uid || `${keyPrefix || "event"}-${j}`;
+      if (!aggregated.has(key)) aggregated.set(key, event);
+    }
+
+    for (let b = 0; b < teamsOnBye.length; b += 1) {
+      const bye = this._normalizeNflByeTeam(teamsOnBye[b]);
+      if (bye) byeTeams.set(bye.abbreviation, bye);
+    }
+  },
+
+  _finalizeNflWeekResults(aggregated, byeTeams) {
     const games = Array.from(aggregated.values());
     const byeList = Array.from(byeTeams.values());
     byeList.sort((a, b) => a.abbreviation.localeCompare(b.abbreviation));
