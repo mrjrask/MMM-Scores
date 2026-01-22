@@ -1285,7 +1285,7 @@ module.exports = NodeHelper.create({
     weekStart.setUTCDate(weekStart.getUTCDate() - offset);
 
     const minutes = (Number.isFinite(hour) ? hour : 0) * 60 + (Number.isFinite(minute) ? minute : 0);
-    if (dayOfWeek === 3 && minutes >= (9 * 60)) {
+    if (dayOfWeek === 2 || (dayOfWeek === 3 && minutes >= (9 * 60))) {
       weekStart.setUTCDate(weekStart.getUTCDate() + 7);
     }
 
