@@ -1157,11 +1157,7 @@ module.exports = NodeHelper.create({
     const pushEvents = (value) => {
       if (Array.isArray(value)) {
         for (let i = 0; i < value.length; i += 1) {
-          const item = value[i];
-          if (!item || typeof item !== "object") continue;
-          if (item.competitions || item.date || item.id || item.uid) {
-            collected.push(item);
-          }
+          if (value[i]) collected.push(value[i]);
         }
       }
     };
@@ -1171,11 +1167,6 @@ module.exports = NodeHelper.create({
 
     if (json.content && typeof json.content === "object") {
       pushEvents(json.content.events);
-      pushEvents(json.content.games);
-      if (json.content.scoreboard && typeof json.content.scoreboard === "object") {
-        pushEvents(json.content.scoreboard.events);
-        pushEvents(json.content.scoreboard.games);
-      }
       if (json.content.schedule && typeof json.content.schedule === "object") {
         pushEvents(json.content.schedule.events);
         pushEvents(json.content.schedule.items);
@@ -1184,22 +1175,6 @@ module.exports = NodeHelper.create({
 
     if (json.scoreboard && typeof json.scoreboard === "object") {
       pushEvents(json.scoreboard.events);
-      pushEvents(json.scoreboard.games);
-    }
-
-    if (Array.isArray(json.sports)) {
-      for (let i = 0; i < json.sports.length; i += 1) {
-        const sport = json.sports[i];
-        if (!sport || typeof sport !== "object") continue;
-        if (Array.isArray(sport.leagues)) {
-          for (let j = 0; j < sport.leagues.length; j += 1) {
-            const league = sport.leagues[j];
-            if (!league || typeof league !== "object") continue;
-            pushEvents(league.events);
-            pushEvents(league.games);
-          }
-        }
-      }
     }
 
     return collected;
@@ -1224,11 +1199,6 @@ module.exports = NodeHelper.create({
     if (json.content && typeof json.content === "object") {
       if (json.content.week && typeof json.content.week === "object") {
         pushByes(json.content.week.teamsOnBye);
-      }
-      if (json.content.scoreboard && typeof json.content.scoreboard === "object") {
-        if (json.content.scoreboard.week && typeof json.content.scoreboard.week === "object") {
-          pushByes(json.content.scoreboard.week.teamsOnBye);
-        }
       }
       if (json.content.schedule && typeof json.content.schedule === "object") {
         if (json.content.schedule.week && typeof json.content.schedule.week === "object") {
