@@ -989,7 +989,7 @@ module.exports = NodeHelper.create({
         }
       }
 
-      if (this._shouldAdvanceNflPlayoffWeek(results.games.length)) {
+      if (this._shouldAdvanceNflPlayoffWeek(results.games)) {
         const nextWeekRange = this._getNflWeekDateRange(1);
         results = await this._fetchNflWeekGames(nextWeekRange.dateIsos);
         results.range = nextWeekRange;
@@ -1094,14 +1094,29 @@ module.exports = NodeHelper.create({
     };
   },
 
-  _shouldAdvanceNflPlayoffWeek(gameCount) {
+  _shouldAdvanceNflPlayoffWeek(games) {
+    if (!Array.isArray(games) || games.length === 0) return false;
     const tz = this.config && this.config.timeZone ? this.config.timeZone : "America/Chicago";
-    const { dateIso, dayOfWeek, minutes } = this._getLocalDateParts(tz);
+    const { dateIso, dayOfWeek, minutes, now } = this._getLocalDateParts(tz);
 
     if (!this._nflPlayoffRulesActive(dateIso)) return false;
 
-    const threshold = this._nflWeekCutoffThreshold(gameCount);
+    const threshold = this._nflWeekCutoffThreshold(games.length);
     if (!threshold) return false;
+
+    const hasUpcomingGame = games.some((game) => {
+      const gameDate = this._firstDate(
+        game && game.date,
+        game && game.startDate,
+        game && game.startTimeUTC,
+        game && game.competitions && game.competitions[0] && (
+          game.competitions[0].date || game.competitions[0].startDate || game.competitions[0].startTimeUTC
+        )
+      );
+      return gameDate && gameDate.getTime() > now.getTime();
+    });
+
+    if (hasUpcomingGame) return false;
 
     if (dayOfWeek > threshold.dayOfWeek) return true;
     return dayOfWeek === threshold.dayOfWeek && minutes >= threshold.minutes;
