@@ -1067,9 +1067,8 @@ module.exports = NodeHelper.create({
 
   _mergeNflScoreboardResponse(json, aggregated, byeTeams, keyPrefix) {
     if (!json || typeof json !== "object") return;
-    const events = Array.isArray(json.events) ? json.events : [];
-    const week = json && json.week;
-    const teamsOnBye = week && Array.isArray(week.teamsOnBye) ? week.teamsOnBye : [];
+    const events = this._collectNflScoreboardEvents(json);
+    const teamsOnBye = this._collectNflScoreboardByes(json);
 
     for (let j = 0; j < events.length; j += 1) {
       const event = events[j];
@@ -1097,40 +1096,15 @@ module.exports = NodeHelper.create({
 
   _shouldAdvanceNflPlayoffWeek(gameCount) {
     const tz = this.config && this.config.timeZone ? this.config.timeZone : "America/Chicago";
-    const now = new Date();
-    const dateIso = now.toLocaleDateString("en-CA", { timeZone: tz });
-    const [, monthStr] = dateIso.split("-");
-    const month = parseInt(monthStr, 10);
+    const { dateIso, dayOfWeek, minutes } = this._getLocalDateParts(tz);
 
-    if (month !== 1 && month !== 2) {
-      return false;
-    }
+    if (!this._nflPlayoffRulesActive(dateIso)) return false;
 
-    if (![6, 4, 2].includes(gameCount)) {
-      return false;
-    }
+    const threshold = this._nflWeekCutoffThreshold(gameCount);
+    if (!threshold) return false;
 
-    const timeStr = now.toLocaleTimeString("en-GB", {
-      timeZone: tz,
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-    const [hStr, mStr] = timeStr.split(":");
-    const hour = parseInt(hStr, 10);
-    const minute = parseInt(mStr, 10);
-    const minutes = (Number.isFinite(hour) ? hour : 0) * 60 + (Number.isFinite(minute) ? minute : 0);
-
-    const localMidnight = new Date(`${dateIso}T00:00:00Z`);
-    const dayOfWeek = localMidnight.getUTCDay();
-
-    if (gameCount === 6) {
-      if (dayOfWeek > 2) return true;
-      return dayOfWeek === 2 && minutes >= (15 * 60);
-    }
-
-    if (dayOfWeek > 1) return true;
-    return dayOfWeek === 1 && minutes >= ((15 * 60) + 15);
+    if (dayOfWeek > threshold.dayOfWeek) return true;
+    return dayOfWeek === threshold.dayOfWeek && minutes >= threshold.minutes;
   },
 
 
@@ -1174,6 +1148,96 @@ module.exports = NodeHelper.create({
       displayName,
       shortDisplayName: team.shortDisplayName || null
     };
+  },
+
+  _collectNflScoreboardEvents(json) {
+    if (!json || typeof json !== "object") return [];
+    const collected = [];
+
+    const pushEvents = (value) => {
+      if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i += 1) {
+          const item = value[i];
+          if (!item || typeof item !== "object") continue;
+          if (item.competitions || item.date || item.id || item.uid) {
+            collected.push(item);
+          }
+        }
+      }
+    };
+
+    pushEvents(json.events);
+    pushEvents(json.games);
+
+    if (json.content && typeof json.content === "object") {
+      pushEvents(json.content.events);
+      pushEvents(json.content.games);
+      if (json.content.scoreboard && typeof json.content.scoreboard === "object") {
+        pushEvents(json.content.scoreboard.events);
+        pushEvents(json.content.scoreboard.games);
+      }
+      if (json.content.schedule && typeof json.content.schedule === "object") {
+        pushEvents(json.content.schedule.events);
+        pushEvents(json.content.schedule.items);
+      }
+    }
+
+    if (json.scoreboard && typeof json.scoreboard === "object") {
+      pushEvents(json.scoreboard.events);
+      pushEvents(json.scoreboard.games);
+    }
+
+    if (Array.isArray(json.sports)) {
+      for (let i = 0; i < json.sports.length; i += 1) {
+        const sport = json.sports[i];
+        if (!sport || typeof sport !== "object") continue;
+        if (Array.isArray(sport.leagues)) {
+          for (let j = 0; j < sport.leagues.length; j += 1) {
+            const league = sport.leagues[j];
+            if (!league || typeof league !== "object") continue;
+            pushEvents(league.events);
+            pushEvents(league.games);
+          }
+        }
+      }
+    }
+
+    return collected;
+  },
+
+  _collectNflScoreboardByes(json) {
+    if (!json || typeof json !== "object") return [];
+    const candidates = [];
+
+    const pushByes = (value) => {
+      if (Array.isArray(value)) {
+        for (let i = 0; i < value.length; i += 1) {
+          if (value[i]) candidates.push(value[i]);
+        }
+      }
+    };
+
+    if (json.week && typeof json.week === "object") {
+      pushByes(json.week.teamsOnBye);
+    }
+
+    if (json.content && typeof json.content === "object") {
+      if (json.content.week && typeof json.content.week === "object") {
+        pushByes(json.content.week.teamsOnBye);
+      }
+      if (json.content.scoreboard && typeof json.content.scoreboard === "object") {
+        if (json.content.scoreboard.week && typeof json.content.scoreboard.week === "object") {
+          pushByes(json.content.scoreboard.week.teamsOnBye);
+        }
+      }
+      if (json.content.schedule && typeof json.content.schedule === "object") {
+        if (json.content.schedule.week && typeof json.content.schedule.week === "object") {
+          pushByes(json.content.schedule.week.teamsOnBye);
+        }
+      }
+    }
+
+    return candidates;
   },
 
   _notifyGames(league, games, extras = null) {
@@ -1295,10 +1359,8 @@ module.exports = NodeHelper.create({
     return dateIso;
   },
 
-  _getNflWeekDateRange(weekOffset = 0) {
-    const tz = this.config && this.config.timeZone ? this.config.timeZone : "America/Chicago";
+  _getLocalDateParts(tz) {
     const now = new Date();
-
     const dateIso = now.toLocaleDateString("en-CA", { timeZone: tz });
     const timeStr = now.toLocaleTimeString("en-GB", {
       timeZone: tz,
@@ -1309,36 +1371,75 @@ module.exports = NodeHelper.create({
     const [hStr, mStr] = timeStr.split(":");
     const hour = parseInt(hStr, 10);
     const minute = parseInt(mStr, 10);
-
+    const minutes = (Number.isFinite(hour) ? hour : 0) * 60 + (Number.isFinite(minute) ? minute : 0);
     const localMidnight = new Date(`${dateIso}T00:00:00Z`);
     const dayOfWeek = localMidnight.getUTCDay();
 
-    const weekStart = new Date(localMidnight);
-    const offset = (dayOfWeek - 4 + 7) % 7; // 4 === Thursday
-    weekStart.setUTCDate(weekStart.getUTCDate() - offset);
+    return {
+      now,
+      dateIso,
+      dayOfWeek,
+      minutes
+    };
+  },
 
-    const minutes = (Number.isFinite(hour) ? hour : 0) * 60 + (Number.isFinite(minute) ? minute : 0);
-    if (dayOfWeek === 2 || (dayOfWeek === 3 && minutes >= (9 * 60))) {
+  _nflWeekStartForDate(dateIso) {
+    const localMidnight = new Date(`${dateIso}T00:00:00Z`);
+    const dayOfWeek = localMidnight.getUTCDay();
+    const offset = (dayOfWeek - 4 + 7) % 7; // 4 === Thursday
+    const weekStart = new Date(localMidnight);
+    weekStart.setUTCDate(weekStart.getUTCDate() - offset);
+    return weekStart;
+  },
+
+  _nflWeekDatesFromStart(weekStart) {
+    const dateIsos = [];
+    const cursor = new Date(weekStart);
+    for (let i = 0; i < 5; i += 1) {
+      dateIsos.push(cursor.toISOString().slice(0, 10));
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+    return dateIsos;
+  },
+
+  _nflRegularWeekStart(dateIso, dayOfWeek, minutes) {
+    const weekStart = this._nflWeekStartForDate(dateIso);
+    if (dayOfWeek === 3 && minutes >= (9 * 60)) {
       weekStart.setUTCDate(weekStart.getUTCDate() + 7);
     }
+    return weekStart;
+  },
+
+  _nflPlayoffRulesActive(dateIso) {
+    const [, monthStr] = String(dateIso || "").split("-");
+    const month = parseInt(monthStr, 10);
+    return month === 1 || month === 2;
+  },
+
+  _nflWeekCutoffThreshold(gameCount) {
+    if (gameCount === 6) {
+      return { dayOfWeek: 2, minutes: 15 * 60 }; // Tuesday 3:00 PM
+    }
+    if (gameCount === 4 || gameCount === 2) {
+      return { dayOfWeek: 1, minutes: (15 * 60) + 15 }; // Monday 3:15 PM
+    }
+    return null;
+  },
+
+  _getNflWeekDateRange(weekOffset = 0) {
+    const tz = this.config && this.config.timeZone ? this.config.timeZone : "America/Chicago";
+    const { dateIso, dayOfWeek, minutes } = this._getLocalDateParts(tz);
+    let weekStart = this._nflRegularWeekStart(dateIso, dayOfWeek, minutes);
 
     if (Number.isFinite(weekOffset) && weekOffset !== 0) {
       weekStart.setUTCDate(weekStart.getUTCDate() + (weekOffset * 7));
     }
 
-    const weekEnd = new Date(weekStart);
-    weekEnd.setUTCDate(weekEnd.getUTCDate() + 4);
-
-    const dateIsos = [];
-    const cursor = new Date(weekStart);
-    while (cursor.getTime() <= weekEnd.getTime()) {
-      dateIsos.push(cursor.toISOString().slice(0, 10));
-      cursor.setUTCDate(cursor.getUTCDate() + 1);
-    }
+    const dateIsos = this._nflWeekDatesFromStart(weekStart);
 
     return {
       startIso: weekStart.toISOString().slice(0, 10),
-      endIso: weekEnd.toISOString().slice(0, 10),
+      endIso: dateIsos[dateIsos.length - 1],
       dateIsos
     };
   }
