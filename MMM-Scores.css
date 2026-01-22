@@ -250,7 +250,6 @@
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
-  line-height: 1;
 }
 
 .scoreboard-card.league-nhl .scoreboard-header {
@@ -272,7 +271,6 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   font-size: calc(var(--scoreboard-label-font) * 0.9 + 1pt);
-  line-height: 1;
 }
 
 .scoreboard-card .scoreboard-status.live {
@@ -286,7 +284,6 @@
   text-align: center;
   color: var(--scoreboard-muted);
   font-weight: 600;
-  line-height: 1;
 }
 
 .scoreboard-card.league-nhl .scoreboard-label {
