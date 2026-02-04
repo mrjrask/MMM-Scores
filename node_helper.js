@@ -1084,7 +1084,7 @@ module.exports = NodeHelper.create({
   },
 
   _finalizeNflWeekResults(aggregated, byeTeams) {
-    const games = Array.from(aggregated.values());
+    const games = Array.from(aggregated.values()).filter((game) => !this._isNflProBowl(game));
     const byeList = Array.from(byeTeams.values());
     byeList.sort((a, b) => a.abbreviation.localeCompare(b.abbreviation));
 
@@ -1092,6 +1092,53 @@ module.exports = NodeHelper.create({
       games,
       byes: byeList
     };
+  },
+
+  _isNflProBowl(game) {
+    if (!game || typeof game !== "object") return false;
+    const tokens = [];
+    const pushToken = (val) => {
+      if (val == null) return;
+      if (typeof val === "string" || typeof val === "number") {
+        const str = String(val).toLowerCase().trim();
+        if (str) tokens.push(str);
+      }
+    };
+
+    pushToken(game.name);
+    pushToken(game.shortName);
+    pushToken(game.description);
+    pushToken(game.headline);
+
+    const competitions = Array.isArray(game.competitions) ? game.competitions : [];
+    for (let i = 0; i < competitions.length; i += 1) {
+      const comp = competitions[i];
+      if (!comp) continue;
+      pushToken(comp.name);
+      pushToken(comp.shortName);
+      pushToken(comp.description);
+      pushToken(comp.headline);
+
+      const competitors = Array.isArray(comp.competitors) ? comp.competitors : [];
+      for (let j = 0; j < competitors.length; j += 1) {
+        const entry = competitors[j] || {};
+        const team = entry.team || {};
+        pushToken(entry.displayName);
+        pushToken(entry.shortDisplayName);
+        pushToken(team.displayName);
+        pushToken(team.shortDisplayName);
+        pushToken(team.name);
+        pushToken(team.abbreviation);
+      }
+    }
+
+    if (tokens.length === 0) return false;
+    const combined = tokens.join(" ");
+    if (combined.includes("pro bowl")) return true;
+    if (combined.includes("pro-bowl")) return true;
+    if (combined.includes("nfc vs afc")) return true;
+    if (combined.includes("afc vs nfc")) return true;
+    return false;
   },
 
   _shouldAdvanceNflPlayoffWeek(games) {
