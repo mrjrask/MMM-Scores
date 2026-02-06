@@ -99,6 +99,8 @@ The module keeps an internal rotation list derived from `league`/`leagues`. It f
 ### Highlighting
 Highlight any number of teams per league using the appropriate `_mlb`, `_nhl`, `_nfl`, `_nba`, `_olympic_mhockey`, or `_olympic_whockey` suffix. Highlights apply to scoreboards.
 
+Olympic hockey country mapping uses IOC-style 3-letter codes (`CAN`, `USA`, `FIN`, `SWE`, `GER`, `SUI`, `CZE`, `SVK`, `LAT`, `DEN`, `FRA`, `ITA`, `JPN`).
+
 ---
 
 ## Assets & Styling
@@ -116,10 +118,12 @@ MMM-Scores/
    │  └─ BOS.png (etc.)
    ├─ nfl/
    │  └─ kc.png  (lowercase filenames)
-   └─ nba/
-      └─ ATL.png (etc.)
+   ├─ nba/
+   │  └─ ATL.png (etc.)
+   └─ oly/
+      └─ USA.png (Olympic country flags, uppercase IOC code)
 ```
-- **Logos**: Place transparent PNG logos named with the abbreviations used in-game data (`CUBS.png`, `NYR.png`, `kc.png`, `CHI.png`, etc.). The module falls back to text when a logo is missing.
+- **Logos**: Place transparent PNG logos named with the abbreviations used in-game data (`CUBS.png`, `NYR.png`, `kc.png`, `CHI.png`, etc.). The module falls back to text when a logo is missing. Olympic men's/women's hockey both read from `images/oly/<CODE>.png` (for example `CAN.png`, `USA.png`, `SWE.png`).
 - **Font**: Drop `fonts/TimesSquare-m105.ttf` into `fonts/`. The CSS registers it with `@font-face`.
 - **Styling tweaks**: Override CSS variables in `MMM-Scores.css` or globally (e.g., `css/custom.css`). Useful variables include `--scoreboard-card-width-base`, `--scoreboard-team-font-base`, `--scoreboard-value-font-base`, `--scoreboard-gap-base`, and `--matrix-gap-base`.
 

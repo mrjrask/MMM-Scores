@@ -17,6 +17,26 @@
     "Athletics": "ATH","Seattle Mariners": "SEA","Texas Rangers": "TEX"
   };
 
+
+
+  var OLYMPIC_COUNTRY_ABBREVIATIONS = {
+    "canada": "CAN",
+    "united states": "USA",
+    "united states of america": "USA",
+    "finland": "FIN",
+    "sweden": "SWE",
+    "germany": "GER",
+    "switzerland": "SUI",
+    "czechia": "CZE",
+    "czech republic": "CZE",
+    "slovakia": "SVK",
+    "latvia": "LAT",
+    "denmark": "DEN",
+    "france": "FRA",
+    "italy": "ITA",
+    "japan": "JPN"
+  };
+
   var NBA_ABBREVIATION_OVERRIDES = {
     // Atlanta Hawks
     "Atlanta Hawks": "ATL",
@@ -2312,8 +2332,22 @@
 
       if (league === "mlb") {
         abbr = MLB_ABBREVIATIONS[name] || team.abbreviation || team.teamAbbreviation || team.triCode || "";
-      } else if (league === "nhl" || league === "olympic_mhockey" || league === "olympic_whockey") {
+      } else if (league === "nhl") {
         abbr = team.teamAbbreviation || team.abbreviation || team.triCode || team.shortName || name;
+      } else if (league === "olympic_mhockey" || league === "olympic_whockey") {
+        var olympicName = String(
+          team.shortDisplayName ||
+          team.displayName ||
+          team.name ||
+          team.teamName ||
+          ""
+        ).trim().toLowerCase();
+        abbr = OLYMPIC_COUNTRY_ABBREVIATIONS[olympicName]
+          || team.teamAbbreviation
+          || team.abbreviation
+          || team.triCode
+          || team.shortName
+          || name;
       } else if (league === "nfl") {
         abbr = team.abbreviation || team.teamAbbreviation || team.shortDisplayName || team.nickname || name;
       } else if (league === "nba") {
@@ -2357,9 +2391,9 @@
       if (league === "nhl") {
         path = "images/nhl/" + String(abbr || "").toUpperCase() + ".png";
       } else if (league === "olympic_mhockey") {
-        path = "images/olympic_mhockey/" + String(abbr || "").toUpperCase() + ".png";
+        path = "images/oly/" + String(abbr || "").toUpperCase() + ".png";
       } else if (league === "olympic_whockey") {
-        path = "images/olympic_whockey/" + String(abbr || "").toUpperCase() + ".png";
+        path = "images/oly/" + String(abbr || "").toUpperCase() + ".png";
       } else if (league === "nfl") {
         path = "images/nfl/" + String(abbr || "").toLowerCase() + ".png";
       } else if (league === "nba") {
