@@ -1,6 +1,6 @@
 # MMM-Scores
 
-A MagicMirror² module that cycles through MLB, NHL, NFL, and NBA scoreboards. Scores are fetched automatically from public APIs with sensible fallbacks.
+A MagicMirror² module that cycles through MLB, NHL, NFL, NBA, and Olympic Ice Hockey scoreboards. Scores are fetched automatically from public APIs with sensible fallbacks.
 
 ---
 
@@ -21,7 +21,7 @@ A MagicMirror² module that cycles through MLB, NHL, NFL, and NBA scoreboards. S
 ---
 
 ## Features
-- **Four-league scoreboards**: MLB (R/H/E linescore), NHL (goals & shots), NFL (quarter-by-quarter totals plus bye list), and NBA (quarter/OT breakdown).
+- **Six-league scoreboards**: MLB (R/H/E linescore), NHL (goals & shots), NFL (quarter-by-quarter totals plus bye list), NBA (quarter/OT breakdown), Men's Olympic Hockey, and Women's Olympic Hockey.
 - **Automatic league rotation**: Show a single league, a custom sequence, or all supported leagues with timed page flips.
 - **Flexible layout**: Control columns, rows, or total games per page per league and scale everything with a single `layoutScale` value.
 - **Favorite team highlighting**: Per-league highlight lists add a subtle accent to matching teams on scoreboards.
@@ -56,11 +56,13 @@ Add this entry to `config/config.js`:
   module: "MMM-Scores",
   position: "middle_center",
   config: {
-    league: "all",                 // "mlb", "nhl", "nfl", "nba", array, or "all"
+    league: "all",                 // "mlb", "nhl", "nfl", "nba", "olympic_mhockey", "olympic_whockey", array, or "all"
     updateIntervalScores: 60 * 1000, // helper refresh frequency
     rotateIntervalScores: 15 * 1000, // front-end page flip interval
     layoutScale: 0.95,               // scale everything uniformly
     highlightedTeams_mlb: ["CUBS"],
+    highlightedTeams_olympic_mhockey: ["USA"],
+    highlightedTeams_olympic_whockey: ["CAN"],
     maxWidth: "720px"
   }
 }
@@ -74,28 +76,28 @@ Every option may be declared globally, as an object keyed by league (`{ mlb: val
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `league` / `leagues` | `string \| string[]` | `"mlb"` | League(s) to display. Accepts `"mlb"`, `"nhl"`, `"nfl"`, `"nba"`, or `"all"`. Arrays define the rotation order. |
+| `league` / `leagues` | `string \| string[]` | `"mlb"` | League(s) to display. Accepts `"mlb"`, `"nhl"`, `"nfl"`, `"nba"`, `"olympic_mhockey"`, `"olympic_whockey"`, or `"all"`. Arrays define the rotation order. |
 | `updateIntervalScores` | `number` | `60000` | Milliseconds between helper fetches. Minimum enforced interval is 10 seconds. |
 | `rotateIntervalScores` | `number` | `15000` | Milliseconds between scoreboard page rotations. |
 | `timeZone` | `string` | `"America/Chicago"` | Time zone used to decide the scoreboard date (requests the previous day before 09:30 local). |
-| `scoreboardColumns` | `number` | auto | Columns per page. Defaults to 2 for MLB (capped at 2) and 4 for NHL/NFL/NBA. |
+| `scoreboardColumns` | `number` | auto | Columns per page. Defaults to 2 for MLB (capped at 2) and 4 for NHL/NFL/NBA/Olympic hockey. |
 | `gamesPerColumn` (`scoreboardRows`) | `number` | auto | Games stacked in each column (4 for all leagues unless overridden). |
 | `gamesPerPage` | `number` | derived | Override the total games per page; rows adjust automatically per league. |
 | `layoutScale` | `number` | `1` | Scales the entire module (clamped between 0.6 and 1.4). |
-| `highlightedTeams_mlb` | `string \| string[]` | `[]` | Team abbreviations to highlight. Also available as `_nhl`, `_nfl`, `_nba`. |
+| `highlightedTeams_mlb` | `string \| string[]` | `[]` | Team abbreviations to highlight. Also available as `_nhl`, `_nfl`, `_nba`, `_olympic_mhockey`, `_olympic_whockey`. |
 | `showTitle` | `boolean` | `true` | Toggles the module header (`MLB Scoreboard`, etc.). |
 | `useTimesSquareFont` | `boolean` | `true` | Applies the Times Square font to scoreboard cards. |
 | `maxWidth` | `string \| number` | `"800px"` | Caps the module width and header alignment. Numbers are treated as pixels. |
 
 ### Layout controls
-- **Per-league overrides**: Append the league suffix (`_nhl`, `_nfl`, `_nba`, `_mlb`) to `scoreboardColumns`, `gamesPerColumn`, or `gamesPerPage` to change a single league's layout.
+- **Per-league overrides**: Append the league suffix (`_nhl`, `_nfl`, `_nba`, `_mlb`, `_olympic_mhockey`, `_olympic_whockey`) to `scoreboardColumns`, `gamesPerColumn`, or `gamesPerPage` to change a single league's layout.
 - **Object form**: For `layoutScale` or highlight lists, you can pass an object with `default` and per-league keys.
 
 ### League rotation
 The module keeps an internal rotation list derived from `league`/`leagues`. It fetches games for every configured league on each helper poll and flips the front-end page every `rotateIntervalScores` milliseconds.
 
 ### Highlighting
-Highlight any number of teams per league using the appropriate `_mlb`, `_nhl`, `_nfl`, or `_nba` suffix. Highlights apply to scoreboards.
+Highlight any number of teams per league using the appropriate `_mlb`, `_nhl`, `_nfl`, `_nba`, `_olympic_mhockey`, or `_olympic_whockey` suffix. Highlights apply to scoreboards.
 
 ---
 
@@ -139,6 +141,8 @@ Scoreboard data comes from league-specific feeds with fallbacks where needed.
 - **NHL scores**: Prefers `statsapi.web.nhl.com` endpoints with automatic fallbacks to the public scoreboard and REST feeds; the date adjusts for early-morning previous-day fetches.
 - **NBA scores**: `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard` for the selected date.
 - **NFL scores**: Weekly schedules from `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=<YYYYMMDD>` aggregated across the current week; includes bye-week teams.
+- **Men's Olympic hockey scores**: `https://site.api.espn.com/apis/site/v2/sports/hockey/mens-olympics/scoreboard?dates=<YYYYMMDD>`.
+- **Women's Olympic hockey scores**: `https://site.api.espn.com/apis/site/v2/sports/hockey/womens-olympics/scoreboard?dates=<YYYYMMDD>`.
 
 ---
 
