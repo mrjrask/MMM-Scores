@@ -948,16 +948,38 @@ module.exports = NodeHelper.create({
 
 
   async _fetchOlympicHockeyGames(league) {
-    try {
-      const { dateIso, dateCompact } = this._getTargetDate();
-      const path = league === "olympic_whockey" ? "womens-olympics" : "mens-olympics";
+    const { dateIso, dateCompact } = this._getTargetDate();
+    const pathCandidates = league === "olympic_whockey"
+      ? ["womens-olympics", "womensolympics"]
+      : ["mens-olympics", "mensolympics"];
+
+    let events = null;
+
+    for (let i = 0; i < pathCandidates.length; i += 1) {
+      const path = pathCandidates[i];
       const url = `https://site.api.espn.com/apis/site/v2/sports/hockey/${path}/scoreboard?dates=${dateCompact}`;
-      const res = await fetch(url);
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        }
+
+        const json = await res.json();
+        events = Array.isArray(json.events) ? json.events : [];
+
+        if (events.length > 0 || i === pathCandidates.length - 1) {
+          break;
+        }
+      } catch (err) {
+        if (i === pathCandidates.length - 1) {
+          throw err;
+        }
       }
-      const json = await res.json();
-      const events = Array.isArray(json.events) ? json.events : [];
+    }
+
+    try {
+      events = Array.isArray(events) ? events : [];
 
       events.sort((a, b) => {
         const dateA = this._firstDate(
@@ -983,6 +1005,7 @@ module.exports = NodeHelper.create({
       this._notifyGames(league, events);
     } catch (e) {
       console.error(`🚨 ${league} fetchGames failed:`, e);
+      this._notifyGames(league, []);
     }
   },
 
