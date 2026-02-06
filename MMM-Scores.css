@@ -102,6 +102,8 @@
 
 .games-matrix.league-nfl,
 .games-matrix.league-nhl,
+.games-matrix.league-olympic_mhockey,
+.games-matrix.league-olympic_whockey,
 .games-matrix.league-nba {
   --scoreboard-card-width-base: var(--scoreboard-card-width-base-compact);
   --games-matrix-col-width: calc(var(--scoreboard-card-width-base) * var(--box-scale));
@@ -225,6 +227,8 @@
 
 .scoreboard-card.league-nfl,
 .scoreboard-card.league-nhl,
+.scoreboard-card.league-olympic_mhockey,
+.scoreboard-card.league-olympic_whockey,
 .scoreboard-card.league-nba {
   --scoreboard-card-width-base: var(--scoreboard-card-width-base-compact);
 }
@@ -256,11 +260,15 @@
   overflow: hidden;
 }
 
-.scoreboard-card.league-nhl .scoreboard-header {
+.scoreboard-card.league-nhl .scoreboard-header,
+.scoreboard-card.league-olympic_mhockey .scoreboard-header,
+.scoreboard-card.league-olympic_whockey .scoreboard-header {
   position: relative;
 }
 
-.scoreboard-card.league-nhl .scoreboard-status {
+.scoreboard-card.league-nhl .scoreboard-status,
+.scoreboard-card.league-olympic_mhockey .scoreboard-status,
+.scoreboard-card.league-olympic_whockey .scoreboard-status {
   position: relative;
   z-index: 1;
   flex-wrap: nowrap;
@@ -270,7 +278,9 @@
   padding-right: calc(var(--scoreboard-gap) * 0.5);
 }
 
-.scoreboard-card.league-nhl .scoreboard-header {
+.scoreboard-card.league-nhl .scoreboard-header,
+.scoreboard-card.league-olympic_mhockey .scoreboard-header,
+.scoreboard-card.league-olympic_whockey .scoreboard-header {
   min-height: calc(var(--scoreboard-status-font) * 1.7);
 }
 
@@ -295,7 +305,9 @@
   font-weight: 600;
 }
 
-.scoreboard-card.league-nhl .scoreboard-label {
+.scoreboard-card.league-nhl .scoreboard-label,
+.scoreboard-card.league-olympic_mhockey .scoreboard-label,
+.scoreboard-card.league-olympic_whockey .scoreboard-label {
   display: none;
 }
 
@@ -319,7 +331,9 @@
   gap: calc(var(--scoreboard-team-font) * 0.25);
 }
 
-.scoreboard-card.league-nhl .scoreboard-team {
+.scoreboard-card.league-nhl .scoreboard-team,
+.scoreboard-card.league-olympic_mhockey .scoreboard-team,
+.scoreboard-card.league-olympic_whockey .scoreboard-team {
   display: grid;
   grid-template-columns: calc(var(--scoreboard-team-font) * 1.2) minmax(0, 1fr);
   align-items: center;
@@ -367,7 +381,9 @@
   max-height: calc(var(--scoreboard-team-font) * 1.1088);
 }
 
-.scoreboard-card.league-nhl .scoreboard-team-logo[src*="/WSH.png"] {
+.scoreboard-card.league-nhl .scoreboard-team-logo[src*="/WSH.png"],
+.scoreboard-card.league-olympic_mhockey .scoreboard-team-logo[src*="/WSH.png"],
+.scoreboard-card.league-olympic_whockey .scoreboard-team-logo[src*="/WSH.png"] {
   height: calc(var(--scoreboard-team-font) * 0.9856);
   width: auto;
   max-height: calc(var(--scoreboard-team-font) * 1.1088);
@@ -383,7 +399,9 @@
   position: relative;
 }
 
-.scoreboard-card.league-nhl .scoreboard-team-abbr {
+.scoreboard-card.league-nhl .scoreboard-team-abbr,
+.scoreboard-card.league-olympic_mhockey .scoreboard-team-abbr,
+.scoreboard-card.league-olympic_whockey .scoreboard-team-abbr {
   justify-self: start;
   width: 100%;
 }
@@ -421,7 +439,9 @@
   color: var(--scoreboard-muted);
 }
 
-.scoreboard-card.league-nhl .scoreboard-value.shots-on-goal-value sup {
+.scoreboard-card.league-nhl .scoreboard-value.shots-on-goal-value sup,
+.scoreboard-card.league-olympic_mhockey .scoreboard-value.shots-on-goal-value sup,
+.scoreboard-card.league-olympic_whockey .scoreboard-value.shots-on-goal-value sup {
   color: var(--scoreboard-text);
 }
 
