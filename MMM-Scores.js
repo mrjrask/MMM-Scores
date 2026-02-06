@@ -179,6 +179,8 @@
       highlightedTeams_nba:             [],
       highlightedTeams_olympic_mhockey: [],
       highlightedTeams_olympic_whockey: [],
+      highlightedTeams_oly_mhockey:     [],
+      highlightedTeams_oly_whockey:     [],
       showTitle:                        true,
       useTimesSquareFont:               true,
 
@@ -448,9 +450,28 @@
       if (league === "nhl") return this.config.highlightedTeams_nhl;
       if (league === "nfl") return this.config.highlightedTeams_nfl;
       if (league === "nba") return this.config.highlightedTeams_nba;
-      if (league === "olympic_mhockey") return this.config.highlightedTeams_olympic_mhockey;
-      if (league === "olympic_whockey") return this.config.highlightedTeams_olympic_whockey;
+      if (league === "olympic_mhockey") {
+        return this._pickFirstHighlightConfig([
+          this.config.highlightedTeams_olympic_mhockey,
+          this.config.highlightedTeams_oly_mhockey
+        ]);
+      }
+      if (league === "olympic_whockey") {
+        return this._pickFirstHighlightConfig([
+          this.config.highlightedTeams_olympic_whockey,
+          this.config.highlightedTeams_oly_whockey
+        ]);
+      }
       return this.config.highlightedTeams_mlb;
+    },
+
+    _pickFirstHighlightConfig: function (values) {
+      for (var i = 0; i < values.length; i++) {
+        var value = values[i];
+        if (Array.isArray(value) && value.length > 0) return value;
+        if (typeof value === "string" && value.trim() !== "") return value;
+      }
+      return values[0];
     },
 
     _injectHeaderWidthStyle: function () {

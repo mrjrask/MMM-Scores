@@ -62,7 +62,7 @@ Add this entry to `config/config.js`:
     layoutScale: 0.95,               // scale everything uniformly
     highlightedTeams_mlb: ["CUBS"],
     highlightedTeams_olympic_mhockey: ["USA"],
-    highlightedTeams_olympic_whockey: ["CAN"],
+    highlightedTeams_oly_whockey: ["CAN"], // short alias also supported
     maxWidth: "720px"
   }
 }
@@ -84,7 +84,7 @@ Every option may be declared globally, as an object keyed by league (`{ mlb: val
 | `gamesPerColumn` (`scoreboardRows`) | `number` | auto | Games stacked in each column (4 for all leagues unless overridden). |
 | `gamesPerPage` | `number` | derived | Override the total games per page; rows adjust automatically per league. |
 | `layoutScale` | `number` | `1` | Scales the entire module (clamped between 0.6 and 1.4). |
-| `highlightedTeams_mlb` | `string \| string[]` | `[]` | Team abbreviations to highlight. Also available as `_nhl`, `_nfl`, `_nba`, `_olympic_mhockey`, `_olympic_whockey`. |
+| `highlightedTeams_mlb` | `string \| string[]` | `[]` | Team abbreviations to highlight. Also available as `_nhl`, `_nfl`, `_nba`, `_olympic_mhockey`/`_oly_mhockey`, `_olympic_whockey`/`_oly_whockey`. |
 | `showTitle` | `boolean` | `true` | Toggles the module header (`MLB Scoreboard`, etc.). |
 | `useTimesSquareFont` | `boolean` | `true` | Applies the Times Square font to scoreboard cards. |
 | `maxWidth` | `string \| number` | `"800px"` | Caps the module width and header alignment. Numbers are treated as pixels. |
@@ -97,7 +97,7 @@ Every option may be declared globally, as an object keyed by league (`{ mlb: val
 The module keeps an internal rotation list derived from `league`/`leagues`. It fetches games for every configured league on each helper poll and flips the front-end page every `rotateIntervalScores` milliseconds.
 
 ### Highlighting
-Highlight any number of teams per league using the appropriate `_mlb`, `_nhl`, `_nfl`, `_nba`, `_olympic_mhockey`, or `_olympic_whockey` suffix. Highlights apply to scoreboards.
+Highlight any number of teams per league using the appropriate `_mlb`, `_nhl`, `_nfl`, `_nba`, `_olympic_mhockey` (or `_oly_mhockey`), or `_olympic_whockey` (or `_oly_whockey`) suffix. Highlights apply to scoreboards.
 
 Olympic hockey country mapping uses IOC-style 3-letter codes (`CAN`, `USA`, `FIN`, `SWE`, `GER`, `SUI`, `CZE`, `SVK`, `LAT`, `DEN`, `FRA`, `ITA`, `JPN`).
 
