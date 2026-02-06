@@ -18,6 +18,8 @@
   --scoreboard-team-font-base:        28px;
   --scoreboard-value-font-base:       32px;
   --scoreboard-metric-width-base:     56px;
+  --scoreboard-nhl-logo-abbr-gap-base: 6px;
+  --scoreboard-nhl-abbr-metric-gap-base: 14px;
   --scoreboard-placeholder-height-base: calc(184px * 0.9);
 
   --scoreboard-card-width:    calc(var(--scoreboard-card-width-base) * var(--box-scale));
@@ -30,6 +32,8 @@
   --scoreboard-team-font:     calc((var(--scoreboard-team-font-base) + 2pt) * var(--box-scale) * var(--scoreboard-height-scale));
   --scoreboard-value-font:    calc((var(--scoreboard-value-font-base) + 2pt) * var(--box-scale) * var(--scoreboard-height-scale));
   --scoreboard-metric-width:  calc(var(--scoreboard-metric-width-base) * var(--box-scale));
+  --scoreboard-nhl-logo-abbr-gap: calc(var(--scoreboard-nhl-logo-abbr-gap-base) * var(--box-scale));
+  --scoreboard-nhl-abbr-metric-gap: calc(var(--scoreboard-nhl-abbr-metric-gap-base) * var(--box-scale));
   --scoreboard-placeholder-height: calc(var(--scoreboard-placeholder-height-base) * var(--box-scale) * var(--scoreboard-height-scale));
   --scoreboard-font-family: 'Times Square', Arial, sans-serif;
 
@@ -319,7 +323,8 @@
   display: grid;
   grid-template-columns: calc(var(--scoreboard-team-font) * 1.2) minmax(0, 1fr);
   align-items: center;
-  gap: calc(var(--scoreboard-gap) * 0.6);
+  gap: var(--scoreboard-nhl-logo-abbr-gap);
+  padding-right: var(--scoreboard-nhl-abbr-metric-gap);
 }
 
 .scoreboard-card .scoreboard-team-total {
