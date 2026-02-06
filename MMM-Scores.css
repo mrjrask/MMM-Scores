@@ -261,8 +261,13 @@
   z-index: 1;
   flex-wrap: nowrap;
   white-space: nowrap;
-  overflow: visible;
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding-right: calc(var(--scoreboard-gap) * 0.5);
+}
+
+.scoreboard-card.league-nhl .scoreboard-header {
+  min-height: calc(var(--scoreboard-status-font) * 1.7);
 }
 
 .scoreboard-card .scoreboard-team-total-label {
@@ -308,6 +313,13 @@
   display: flex;
   align-items: center;
   gap: calc(var(--scoreboard-team-font) * 0.25);
+}
+
+.scoreboard-card.league-nhl .scoreboard-team {
+  display: grid;
+  grid-template-columns: calc(var(--scoreboard-team-font) * 1.2) minmax(0, 1fr);
+  align-items: center;
+  gap: calc(var(--scoreboard-gap) * 0.6);
 }
 
 .scoreboard-card .scoreboard-team-total {
@@ -364,6 +376,11 @@
   font-weight: 600;
   text-align: left;
   position: relative;
+}
+
+.scoreboard-card.league-nhl .scoreboard-team-abbr {
+  justify-self: start;
+  width: 100%;
 }
 
 .scoreboard-card .scoreboard-team-abbr .scoreboard-possession-icon {
