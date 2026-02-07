@@ -20,6 +20,8 @@ module.exports = NodeHelper.create({
     this.fetchTimer = null;
     this._nhlStatsDnsStatus = { available: null, checkedAt: 0 };
     this._nhlStatsRestStatus = { available: null, checkedAt: 0, warnedAt: 0 };
+    this._providerCache = new Map();
+    this._olympicLastGoodByLeague = {};
   },
 
   socketNotificationReceived(notification, payload) {
@@ -985,85 +987,251 @@ module.exports = NodeHelper.create({
 
 
   async _fetchOlympicHockeyGames(league) {
-    try {
-      const { dateIso, dateCompact } = this._getTargetDate({ usePreviousDayEarly: false });
-      const pathCandidates = league === "olympic_whockey"
-        ? ["womens-olympics", "womensolympics", "olympics-women", "olympicswomen", "olympics"]
-        : ["mens-olympics", "mensolympics", "olympics-men", "olympicsmen", "olympics"];
-
-      let events = [];
-      let lastError = null;
-      const queryCandidates = [
-        `?dates=${dateCompact}`,
-        ""
+    const leagueKey = league === "olympic_whockey" ? "olympic_whockey" : "olympic_mhockey";
+    const providerPlans = leagueKey === "olympic_whockey"
+      ? [
+        { name: "espn_womens_olympics", fetcher: (dateIso, dateCompact) => this.fetchOlympicScoreboardWomen(dateIso, dateCompact) },
+        { name: "olympics_com", fetcher: (dateIso) => this._fetchOlympicsComFallback(leagueKey, dateIso) },
+        { name: "iihf", fetcher: (dateIso) => this._fetchIihfFallback(leagueKey, dateIso) },
+        { name: "thesportsdb", fetcher: (dateIso) => this._fetchTheSportsDbFallback(leagueKey, dateIso) },
+        { name: "wikipedia", fetcher: (dateIso) => this._fetchWikipediaFinalsFallback(leagueKey, dateIso) }
+      ]
+      : [
+        { name: "espn_mens_olympics", fetcher: (dateIso, dateCompact) => this.fetchOlympicScoreboardMen(dateIso, dateCompact) },
+        { name: "olympics_com", fetcher: (dateIso) => this._fetchOlympicsComFallback(leagueKey, dateIso) },
+        { name: "iihf", fetcher: (dateIso) => this._fetchIihfFallback(leagueKey, dateIso) },
+        { name: "thesportsdb", fetcher: (dateIso) => this._fetchTheSportsDbFallback(leagueKey, dateIso) },
+        { name: "wikipedia", fetcher: (dateIso) => this._fetchWikipediaFinalsFallback(leagueKey, dateIso) }
       ];
 
-      for (let i = 0; i < pathCandidates.length; i += 1) {
-        const path = pathCandidates[i];
-        for (let q = 0; q < queryCandidates.length; q += 1) {
-          const query = queryCandidates[q];
-          const url = `https://site.api.espn.com/apis/site/v2/sports/hockey/${path}/scoreboard${query}`;
+    try {
+      const { dateIso, dateCompact } = this._getTargetDate();
+      let normalizedGames = [];
+      let providerUsed = "none";
 
-          try {
-            const res = await fetch(url);
-            if (!res.ok) {
-              throw new Error(`HTTP ${res.status} ${res.statusText}`);
-            }
-
-            const json = await res.json();
-            const candidateEvents = this._collectEspnScoreboardEvents(json);
-            if (candidateEvents.length > 0 || events.length === 0) {
-              events = candidateEvents;
-            }
-            if (candidateEvents.length > 0) break;
-          } catch (err) {
-            lastError = err;
+      for (let i = 0; i < providerPlans.length; i += 1) {
+        const provider = providerPlans[i];
+        try {
+          const cached = this._getProviderCache(provider.name, leagueKey, dateIso);
+          if (cached) {
+            normalizedGames = cached;
+            providerUsed = `${provider.name} (cache)`;
+            break;
           }
-        }
 
-        if (events.length > 0) {
-          break;
-        }
-      }
-
-      if (events.length === 0 && lastError) {
-        console.warn(`⚠️ ${league} scoreboard fetch fell back to empty set:`, lastError.message || lastError);
-      }
-
-      if (events.length === 0) {
-        const resultPageEvents = await this._fetchOlympicResultsPageGames(league, dateIso);
-        if (resultPageEvents.length > 0) {
-          console.info(`ℹ️ ${league} using ESPN Olympic results page fallback (${resultPageEvents.length} games).`);
-          events = resultPageEvents;
+          const candidate = await provider.fetcher(dateIso, dateCompact);
+          const games = Array.isArray(candidate) ? candidate : [];
+          if (games.length > 0) {
+            normalizedGames = games;
+            providerUsed = provider.name;
+            this._setProviderCache(provider.name, leagueKey, dateIso, games);
+            break;
+          }
+          console.info(`ℹ️ ${leagueKey} provider ${provider.name} returned 0 games, trying fallback.`);
+        } catch (providerError) {
+          console.warn(`⚠️ ${leagueKey} provider ${provider.name} failed, trying fallback:`, providerError.message || providerError);
         }
       }
 
-      events.sort((a, b) => {
-        const dateA = this._firstDate(
-          a && a.date,
-          a && a.startDate,
-          a && a.startTimeUTC,
-          a && a.competitions && a.competitions[0] && (a.competitions[0].date || a.competitions[0].startDate || a.competitions[0].startTimeUTC)
-        );
-        const dateB = this._firstDate(
-          b && b.date,
-          b && b.startDate,
-          b && b.startTimeUTC,
-          b && b.competitions && b.competitions[0] && (b.competitions[0].date || b.competitions[0].startDate || b.competitions[0].startTimeUTC)
-        );
+      if (normalizedGames.length === 0) {
+        const resultPageEvents = await this._fetchOlympicResultsPageGames(leagueKey, dateIso);
+        const resultsFallbackGames = this._normalizedOlympicGamesFromEvents(resultPageEvents, leagueKey, "espn_results_page");
+        if (resultsFallbackGames.length > 0) {
+          normalizedGames = resultsFallbackGames;
+          providerUsed = "espn_results_page";
+        }
+      }
 
-        if (dateA && dateB) return dateA - dateB;
-        if (dateA) return -1;
-        if (dateB) return 1;
-        return 0;
+      if (normalizedGames.length > 0) {
+        this._olympicLastGoodByLeague[leagueKey] = normalizedGames;
+      } else if (Array.isArray(this._olympicLastGoodByLeague[leagueKey]) && this._olympicLastGoodByLeague[leagueKey].length > 0) {
+        normalizedGames = this._olympicLastGoodByLeague[leagueKey];
+        providerUsed = "last_good_cache";
+      }
+
+      const events = this._normalizedGamesToLegacyEvents(normalizedGames);
+      console.log(`🥅 Sending ${events.length} ${leagueKey} games for ${dateIso} to front-end via ${providerUsed}.`);
+      this._notifyGames(leagueKey, events, {
+        olympicDiagnostics: {
+          providerUsed,
+          fetchedAtUTC: new Date().toISOString(),
+          gameCount: events.length,
+          dateIso
+        }
       });
-
-      console.log(`🥅 Sending ${events.length} ${league} games for ${dateIso} to front-end.`);
-      this._notifyGames(league, events);
     } catch (e) {
-      console.error(`🚨 ${league} fetchGames failed:`, e);
-      this._notifyGames(league, []);
+      console.error(`🚨 ${leagueKey} fetchGames failed:`, e);
+      const fallbackGames = Array.isArray(this._olympicLastGoodByLeague[leagueKey]) ? this._olympicLastGoodByLeague[leagueKey] : [];
+      this._notifyGames(leagueKey, this._normalizedGamesToLegacyEvents(fallbackGames));
     }
+  },
+
+  async fetchOlympicScoreboardMen(dateIso, dateCompact) {
+    const url = `https://site.api.espn.com/apis/site/v2/sports/hockey/mens-olympics/scoreboard?dates=${dateCompact || String(dateIso || "").replace(/-/g, "")}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    const json = await res.json();
+    return this.normalizeEspnOlympicResponse(json, "olympic_mhockey", "espn_mens_olympics");
+  },
+
+  async fetchOlympicScoreboardWomen(dateIso, dateCompact) {
+    const url = `https://site.api.espn.com/apis/site/v2/sports/hockey/womens-olympics/scoreboard?dates=${dateCompact || String(dateIso || "").replace(/-/g, "")}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    const json = await res.json();
+    return this.normalizeEspnOlympicResponse(json, "olympic_whockey", "espn_womens_olympics");
+  },
+
+  normalizeEspnOlympicResponse(json, leagueKey, providerName) {
+    const events = this._collectEspnScoreboardEvents(json);
+    return this._normalizedOlympicGamesFromEvents(events, leagueKey, providerName);
+  },
+
+  _normalizedOlympicGamesFromEvents(events, leagueKey, providerName) {
+    const fetchedAtUTC = new Date().toISOString();
+    const normalized = [];
+    const eventList = Array.isArray(events) ? events : [];
+    for (let i = 0; i < eventList.length; i += 1) {
+      const event = eventList[i] || {};
+      const competition = event && Array.isArray(event.competitions) ? event.competitions[0] : null;
+      const competitors = competition && Array.isArray(competition.competitors) ? competition.competitors : [];
+      const homeCompetitor = competitors.find((item) => item && item.homeAway === "home") || competitors[0] || {};
+      const awayCompetitor = competitors.find((item) => item && item.homeAway === "away") || competitors[1] || {};
+      const status = this._normalizeOlympicStatus(event.status || (competition && competition.status) || {});
+
+      normalized.push({
+        leagueKey,
+        gameId: String(event.id || (competition && competition.id) || `${leagueKey}-${i}`),
+        startTimeUTC: this._firstString(
+          event.date,
+          event.startDate,
+          competition && (competition.date || competition.startDate),
+          ""
+        ),
+        status: status.status,
+        period: status.period,
+        clock: status.clock,
+        home: this._normalizeOlympicTeam(homeCompetitor),
+        away: this._normalizeOlympicTeam(awayCompetitor),
+        venue: competition && competition.venue ? (competition.venue.fullName || competition.venue.name || "") : "",
+        source: { providerName, fetchedAtUTC }
+      });
+    }
+
+    normalized.sort((a, b) => {
+      const da = this._firstDate(a.startTimeUTC);
+      const db = this._firstDate(b.startTimeUTC);
+      if (da && db) return da - db;
+      if (da) return -1;
+      if (db) return 1;
+      return 0;
+    });
+
+    return normalized;
+  },
+
+  _normalizeOlympicStatus(statusObj) {
+    const rawType = (((statusObj || {}).type || {}).state || "").toString().toLowerCase();
+    const detailed = (((statusObj || {}).type || {}).description || (statusObj || {}).detail || "").toString();
+    const period = (((statusObj || {}).type || {}).shortDetail || "").toString();
+    const clock = ((statusObj || {}).displayClock || "").toString();
+
+    let status = "pre";
+    if (rawType === "in" || rawType === "live") status = "live";
+    else if (rawType === "post" || rawType === "final") status = "final";
+
+    return { status, detailed, period, clock };
+  },
+
+  _normalizeOlympicTeam(competitor) {
+    const team = (competitor && competitor.team) || {};
+    const name = team.displayName || team.shortDisplayName || team.name || competitor.displayName || "";
+    const code3 = String(team.abbreviation || team.shortDisplayName || "").trim().toUpperCase().slice(0, 3);
+    return {
+      code3,
+      name,
+      score: competitor && competitor.score != null ? String(competitor.score) : ""
+    };
+  },
+
+  _normalizedGamesToLegacyEvents(games) {
+    const list = Array.isArray(games) ? games : [];
+    return list.map((game) => {
+      const statusObj = this._legacyStatusFromNormalized(game);
+      return {
+        id: game.gameId,
+        date: game.startTimeUTC,
+        competitions: [{
+          date: game.startTimeUTC,
+          competitors: [
+            { homeAway: "away", score: game.away && game.away.score, team: { abbreviation: game.away && game.away.code3, displayName: game.away && game.away.name } },
+            { homeAway: "home", score: game.home && game.home.score, team: { abbreviation: game.home && game.home.code3, displayName: game.home && game.home.name } }
+          ],
+          venue: { fullName: game.venue || "" },
+          status: statusObj
+        }],
+        status: statusObj
+      };
+    });
+  },
+
+  _legacyStatusFromNormalized(game) {
+    const state = (game && game.status) || "pre";
+    const isLive = state === "live";
+    const isFinal = state === "final";
+    return {
+      abstractGameState: isLive ? "Live" : (isFinal ? "Final" : "Preview"),
+      detailedState: isLive
+        ? (game.period || game.clock || "In Progress")
+        : (isFinal ? "Final" : "Scheduled"),
+      displayClock: (game && game.clock) || "",
+      period: (game && game.period) || "",
+      type: {
+        state: isLive ? "in" : (isFinal ? "post" : "pre"),
+        description: isLive ? "In Progress" : (isFinal ? "Final" : "Scheduled"),
+        shortDetail: (game && game.period) || (isFinal ? "Final" : "Scheduled")
+      }
+    };
+  },
+
+  _getProviderCache(providerName, leagueKey, dateIso) {
+    const ttlMs = Math.max(15000, Number(this.config && this.config.providerCacheMs) || 20000);
+    const key = `${providerName}|${leagueKey}|${dateIso}`;
+    const entry = this._providerCache.get(key);
+    if (!entry) return null;
+    if ((Date.now() - entry.savedAtMs) > ttlMs) {
+      this._providerCache.delete(key);
+      return null;
+    }
+    return Array.isArray(entry.games) ? entry.games : null;
+  },
+
+  _setProviderCache(providerName, leagueKey, dateIso, games) {
+    const key = `${providerName}|${leagueKey}|${dateIso}`;
+    this._providerCache.set(key, {
+      savedAtMs: Date.now(),
+      games: Array.isArray(games) ? games : []
+    });
+  },
+
+  async _fetchOlympicsComFallback(_leagueKey, _dateIso) {
+    // TODO: olympics.com HTML/JSON discovery provider integration.
+    return [];
+  },
+
+  async _fetchIihfFallback(_leagueKey, _dateIso) {
+    // TODO: IIHF Olympic schedule/results provider integration.
+    return [];
+  },
+
+  async _fetchTheSportsDbFallback(_leagueKey, _dateIso) {
+    // TODO: TheSportsDB free community API provider integration.
+    return [];
+  },
+
+  async _fetchWikipediaFinalsFallback(_leagueKey, _dateIso) {
+    // TODO: Wikipedia/Wikidata completed-game finals fallback integration.
+    return [];
   },
 
   async _fetchOlympicResultsPageGames(league, dateIso) {
@@ -1583,6 +1751,16 @@ module.exports = NodeHelper.create({
       if (!Number.isNaN(dt.getTime())) return dt;
     }
     return null;
+  },
+
+  _firstString(...values) {
+    for (let i = 0; i < values.length; i += 1) {
+      const value = values[i];
+      if (value == null) continue;
+      const text = String(value).trim();
+      if (text) return text;
+    }
+    return "";
   },
 
   _getLeague() {

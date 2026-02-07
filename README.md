@@ -54,7 +54,12 @@ Use this script to verify that every external API endpoint used by the helper is
 ```bash
 npm run test:api
 ```
-The command checks MLB, NHL (all fallback feeds), NFL, NBA, and both Olympic hockey scoreboard endpoints, then exits non-zero if any connection fails.
+The command checks MLB, NHL (all fallback feeds), NFL, NBA, and both Olympic hockey ESPN endpoints, then exits non-zero if any connection fails.
+
+Use this Olympic-focused diagnostics script to check provider reachability and print normalized men's/women's Olympic games for a target date:
+```bash
+npm run test:olympic -- 2026-02-11
+```
 
 ---
 
@@ -89,6 +94,7 @@ Every option may be declared globally, as an object keyed by league (`{ mlb: val
 | `updateIntervalScores` | `number` | `60000` | Milliseconds between helper fetches. Minimum enforced interval is 10 seconds. |
 | `rotateIntervalScores` | `number` | `15000` | Milliseconds between scoreboard page rotations. |
 | `timeZone` | `string` | `"America/Chicago"` | Time zone used to decide the scoreboard date (requests the previous day before 09:30 local). |
+| `providerCacheMs` | `number` | `20000` | Per-provider/per-date Olympic provider cache TTL in milliseconds (minimum 15000). |
 | `scoreboardColumns` | `number` | auto | Columns per page. Defaults to 2 for MLB (capped at 2) and 4 for NHL/NFL/NBA/Olympic hockey. |
 | `gamesPerColumn` (`scoreboardRows`) | `number` | auto | Games stacked in each column (4 for all leagues unless overridden). |
 | `gamesPerPage` | `number` | derived | Override the total games per page; rows adjust automatically per league. |
@@ -154,8 +160,8 @@ Scoreboard data comes from league-specific feeds with fallbacks where needed.
 - **NHL scores**: Prefers `statsapi.web.nhl.com` endpoints with automatic fallbacks to the public scoreboard and REST feeds; the date adjusts for early-morning previous-day fetches.
 - **NBA scores**: `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard` for the selected date.
 - **NFL scores**: Weekly schedules from `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=<YYYYMMDD>` aggregated across the current week; includes bye-week teams.
-- **Men's Olympic hockey scores**: `https://site.api.espn.com/apis/site/v2/sports/hockey/mens-olympics/scoreboard?dates=<YYYYMMDD>`.
-- **Women's Olympic hockey scores**: `https://site.api.espn.com/apis/site/v2/sports/hockey/womens-olympics/scoreboard?dates=<YYYYMMDD>`.
+- **Men's Olympic hockey scores**: Primary `https://site.api.espn.com/apis/site/v2/sports/hockey/mens-olympics/scoreboard?dates=<YYYYMMDD>` with resilient provider-chain hooks (`olympics.com`, IIHF, TheSportsDB, Wikipedia/Wikidata finals) and last-good-data fallback.
+- **Women's Olympic hockey scores**: Primary `https://site.api.espn.com/apis/site/v2/sports/hockey/womens-olympics/scoreboard?dates=<YYYYMMDD>` with the same provider-chain/fallback architecture.
 
 ---
 
