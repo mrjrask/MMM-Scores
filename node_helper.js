@@ -1030,6 +1030,14 @@ module.exports = NodeHelper.create({
         console.warn(`⚠️ ${league} scoreboard fetch fell back to empty set:`, lastError.message || lastError);
       }
 
+      if (events.length === 0) {
+        const resultPageEvents = await this._fetchOlympicResultsPageGames(league, dateIso);
+        if (resultPageEvents.length > 0) {
+          console.info(`ℹ️ ${league} using ESPN Olympic results page fallback (${resultPageEvents.length} games).`);
+          events = resultPageEvents;
+        }
+      }
+
       events.sort((a, b) => {
         const dateA = this._firstDate(
           a && a.date,
@@ -1056,6 +1064,253 @@ module.exports = NodeHelper.create({
       console.error(`🚨 ${league} fetchGames failed:`, e);
       this._notifyGames(league, []);
     }
+  },
+
+  async _fetchOlympicResultsPageGames(league, dateIso) {
+    const urls = [
+      "https://www.espn.com/olympics/winter/2026/results",
+      "https://www.espn.com/olympics/winter/_/year/2026/results"
+    ];
+
+    for (let i = 0; i < urls.length; i += 1) {
+      const url = urls[i];
+      try {
+        const res = await fetch(url, {
+          headers: {
+            "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "accept-language": "en-US,en;q=0.9"
+          }
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        }
+
+        const html = await res.text();
+        const roots = this._extractEspnPageStatePayloads(html);
+        const rawGames = [];
+
+        for (let r = 0; r < roots.length; r += 1) {
+          this._collectOlympicResultsCandidates(roots[r], rawGames);
+        }
+
+        const normalized = [];
+        for (let g = 0; g < rawGames.length; g += 1) {
+          const candidate = rawGames[g] || {};
+          if (!this._resultCandidateMatchesLeague(candidate, league)) continue;
+
+          const normalizedGame = this._normalizeOlympicResultsGame(candidate.game);
+          if (!normalizedGame) continue;
+
+          const gameDate = this._firstDate(
+            normalizedGame.date,
+            normalizedGame.competitions && normalizedGame.competitions[0] && normalizedGame.competitions[0].date
+          );
+          const gameDateIso = gameDate ? gameDate.toISOString().slice(0, 10) : "";
+          if (dateIso && gameDateIso && gameDateIso !== dateIso) continue;
+
+          normalized.push(normalizedGame);
+        }
+
+        if (normalized.length > 0) {
+          return this._dedupeEspnEvents(normalized);
+        }
+      } catch (err) {
+        console.warn(`⚠️ ${league} results-page fallback failed at ${url}:`, err.message || err);
+      }
+    }
+
+    return [];
+  },
+
+  _extractEspnPageStatePayloads(html) {
+    if (!html || typeof html !== "string") return [];
+    const payloads = [];
+
+    const parseAndPush = (jsonText) => {
+      if (!jsonText || typeof jsonText !== "string") return;
+      try {
+        payloads.push(JSON.parse(jsonText));
+      } catch (_err) {
+        // ignore malformed payloads
+      }
+    };
+
+    const nextDataMatch = html.match(/<script[^>]*id=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+    if (nextDataMatch && nextDataMatch[1]) parseAndPush(nextDataMatch[1].trim());
+
+    const fittMatch = html.match(/window\[['"]__espnfitt__['"]\]\s*=\s*([\s\S]*?);\s*<\/script>/i);
+    if (fittMatch && fittMatch[1]) parseAndPush(fittMatch[1].trim());
+
+    const initialStateMatch = html.match(/window\.__INITIAL_STATE__\s*=\s*([\s\S]*?);\s*(?:window\.|<\/script>)/i);
+    if (initialStateMatch && initialStateMatch[1]) parseAndPush(initialStateMatch[1].trim());
+
+    return payloads;
+  },
+
+  _collectOlympicResultsCandidates(value, out, depth = 0, seen = null, context = null) {
+    if (!value || depth > 14) return;
+    if (!seen) seen = new Set();
+    if (!context) context = { sport: null, division: null };
+
+    if (typeof value === "object") {
+      if (seen.has(value)) return;
+      seen.add(value);
+    }
+
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i += 1) {
+        this._collectOlympicResultsCandidates(value[i], out, depth + 1, seen, context);
+      }
+      return;
+    }
+
+    if (typeof value !== "object") return;
+
+    const label = this._extractOlympicSectionLabel(value);
+    const nextContext = {
+      sport: context.sport,
+      division: context.division
+    };
+
+    if (label) {
+      if (this._labelMentionsIceHockey(label)) nextContext.sport = "ice_hockey";
+      const division = this._extractOlympicDivisionFromText(label);
+      if (division) nextContext.division = division;
+    }
+
+    const competitors = Array.isArray(value.competitors)
+      ? value.competitors
+      : (value.competition && Array.isArray(value.competition.competitors) ? value.competition.competitors : null);
+    const hasCompetitionShape = competitors && competitors.length >= 2 && (value.date || value.startDate || value.status || value.competition);
+    if (hasCompetitionShape) {
+      const rawDivision = this._extractOlympicDivisionFromText(JSON.stringify(value));
+      const division = rawDivision || nextContext.division;
+      const sport = nextContext.sport || (this._labelMentionsIceHockey(JSON.stringify(value)) ? "ice_hockey" : null);
+
+      out.push({
+        game: value,
+        sport,
+        division
+      });
+    }
+
+    const keys = Object.keys(value);
+    for (let k = 0; k < keys.length; k += 1) {
+      this._collectOlympicResultsCandidates(value[keys[k]], out, depth + 1, seen, nextContext);
+    }
+  },
+
+  _extractOlympicSectionLabel(value) {
+    if (!value || typeof value !== "object") return "";
+
+    const candidates = [
+      value.header,
+      value.title,
+      value.name,
+      value.shortName,
+      value.displayName,
+      value.description,
+      value.text,
+      value.label
+    ];
+
+    for (let i = 0; i < candidates.length; i += 1) {
+      const entry = candidates[i];
+      if (typeof entry === "string" && entry.trim()) return entry;
+      if (entry && typeof entry === "object") {
+        const nested = [entry.text, entry.label, entry.displayName, entry.name, entry.shortText];
+        for (let n = 0; n < nested.length; n += 1) {
+          if (typeof nested[n] === "string" && nested[n].trim()) return nested[n];
+        }
+      }
+    }
+
+    return "";
+  },
+
+  _extractOlympicDivisionFromText(text) {
+    if (!text || typeof text !== "string") return null;
+    const lower = text.toLowerCase();
+    if (/women\b|women's|womens/.test(lower)) return "women";
+    if (/men\b|men's|mens/.test(lower)) return "men";
+    return null;
+  },
+
+  _labelMentionsIceHockey(text) {
+    if (!text || typeof text !== "string") return false;
+    return text.toLowerCase().includes("ice hockey");
+  },
+
+  _resultCandidateMatchesLeague(candidate, league) {
+    if (!candidate || typeof candidate !== "object") return false;
+    if (candidate.sport !== "ice_hockey") return false;
+
+    if (league === "olympic_whockey") return candidate.division === "women";
+    if (league === "olympic_mhockey") return candidate.division === "men";
+    return true;
+  },
+
+  _normalizeOlympicResultsGame(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const source = raw.competition && typeof raw.competition === "object" ? raw.competition : raw;
+    const competitors = Array.isArray(source.competitors) ? source.competitors : [];
+    if (competitors.length < 2) return null;
+
+    const normalizedCompetitors = [];
+    for (let i = 0; i < competitors.length; i += 1) {
+      const entry = competitors[i] || {};
+      const team = entry.team || entry.athlete || entry.participant || {};
+      const name = team.displayName || team.shortDisplayName || team.name || entry.displayName || entry.name;
+      const abbr = team.abbreviation || entry.abbreviation || team.shortName || (name ? String(name).slice(0, 3).toUpperCase() : "");
+      if (!name && !abbr) continue;
+
+      normalizedCompetitors.push({
+        homeAway: entry.homeAway || (i === 0 ? "home" : "away"),
+        score: entry.score != null ? String(entry.score) : null,
+        winner: !!entry.winner,
+        team: {
+          abbreviation: abbr,
+          displayName: name || abbr,
+          shortDisplayName: team.shortDisplayName || name || abbr,
+          logo: team.logo || team.logos || null
+        }
+      });
+    }
+
+    if (normalizedCompetitors.length < 2) return null;
+
+    const name = source.name || raw.name || source.shortName || raw.shortName || "Olympic Ice Hockey";
+    const status = source.status || raw.status || {};
+
+    return {
+      id: source.id || raw.id || raw.uid || null,
+      uid: source.uid || raw.uid || null,
+      name,
+      shortName: source.shortName || raw.shortName || name,
+      date: source.date || source.startDate || raw.date || raw.startDate || null,
+      status,
+      competitions: [
+        {
+          id: source.id || raw.id || null,
+          date: source.date || source.startDate || raw.date || raw.startDate || null,
+          status,
+          competitors: normalizedCompetitors
+        }
+      ]
+    };
+  },
+
+  _dedupeEspnEvents(events) {
+    const map = new Map();
+    for (let i = 0; i < events.length; i += 1) {
+      const event = events[i];
+      if (!event) continue;
+      const key = event.id || event.uid || `${event.shortName || "evt"}-${event.date || i}`;
+      if (!map.has(key)) map.set(key, event);
+    }
+    return Array.from(map.values());
   },
 
   async _fetchNbaGames() {
