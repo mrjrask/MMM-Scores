@@ -48,18 +48,23 @@ module.exports = NodeHelper.create({
 
     for (let i = 0; i < leagues.length; i++) {
       const league = leagues[i];
-      if (league === "nhl") {
-        await this._fetchNhlGames();
-      } else if (league === "olympic_mhockey") {
-        await this._fetchOlympicHockeyGames("olympic_mhockey");
-      } else if (league === "olympic_whockey") {
-        await this._fetchOlympicHockeyGames("olympic_whockey");
-      } else if (league === "nfl") {
-        await this._fetchNflGames();
-      } else if (league === "nba") {
-        await this._fetchNbaGames();
-      } else {
-        await this._fetchMlbGames();
+      try {
+        if (league === "nhl") {
+          await this._fetchNhlGames();
+        } else if (league === "olympic_mhockey") {
+          await this._fetchOlympicHockeyGames("olympic_mhockey");
+        } else if (league === "olympic_whockey") {
+          await this._fetchOlympicHockeyGames("olympic_whockey");
+        } else if (league === "nfl") {
+          await this._fetchNflGames();
+        } else if (league === "nba") {
+          await this._fetchNbaGames();
+        } else {
+          await this._fetchMlbGames();
+        }
+      } catch (err) {
+        console.error(`🚨 ${league} fetch loop failed:`, err);
+        this._notifyGames(league, []);
       }
     }
   },
@@ -948,38 +953,39 @@ module.exports = NodeHelper.create({
 
 
   async _fetchOlympicHockeyGames(league) {
-    const { dateIso, dateCompact } = this._getTargetDate();
-    const pathCandidates = league === "olympic_whockey"
-      ? ["womens-olympics", "womensolympics"]
-      : ["mens-olympics", "mensolympics"];
+    try {
+      const { dateIso, dateCompact } = this._getTargetDate();
+      const pathCandidates = league === "olympic_whockey"
+        ? ["womens-olympics", "womensolympics", "olympics-women", "olympicswomen"]
+        : ["mens-olympics", "mensolympics", "olympics-men", "olympicsmen"];
 
-    let events = null;
+      let events = [];
+      let lastError = null;
 
-    for (let i = 0; i < pathCandidates.length; i += 1) {
-      const path = pathCandidates[i];
-      const url = `https://site.api.espn.com/apis/site/v2/sports/hockey/${path}/scoreboard?dates=${dateCompact}`;
+      for (let i = 0; i < pathCandidates.length; i += 1) {
+        const path = pathCandidates[i];
+        const url = `https://site.api.espn.com/apis/site/v2/sports/hockey/${path}/scoreboard?dates=${dateCompact}`;
 
-      try {
-        const res = await fetch(url);
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status} ${res.statusText}`);
-        }
+        try {
+          const res = await fetch(url);
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status} ${res.statusText}`);
+          }
 
-        const json = await res.json();
-        events = Array.isArray(json.events) ? json.events : [];
-
-        if (events.length > 0 || i === pathCandidates.length - 1) {
-          break;
-        }
-      } catch (err) {
-        if (i === pathCandidates.length - 1) {
-          throw err;
+          const json = await res.json();
+          const candidateEvents = this._collectEspnScoreboardEvents(json);
+          if (candidateEvents.length > 0 || events.length === 0) {
+            events = candidateEvents;
+          }
+          if (candidateEvents.length > 0) break;
+        } catch (err) {
+          lastError = err;
         }
       }
-    }
 
-    try {
-      events = Array.isArray(events) ? events : [];
+      if (events.length === 0 && lastError) {
+        console.warn(`⚠️ ${league} scoreboard fetch fell back to empty set:`, lastError.message || lastError);
+      }
 
       events.sort((a, b) => {
         const dateA = this._firstDate(
@@ -1014,8 +1020,11 @@ module.exports = NodeHelper.create({
       const { dateIso, dateCompact } = this._getTargetDate();
       const url = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateCompact}`;
       const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      }
       const json = await res.json();
-      const events = Array.isArray(json.events) ? json.events : [];
+      const events = this._collectEspnScoreboardEvents(json);
 
       events.sort((a, b) => {
         const dateA = this._firstDate(
@@ -1041,7 +1050,37 @@ module.exports = NodeHelper.create({
       this._notifyGames("nba", events);
     } catch (e) {
       console.error("🚨 NBA fetchGames failed:", e);
+      this._notifyGames("nba", []);
     }
+  },
+
+  _collectEspnScoreboardEvents(json) {
+    if (!json || typeof json !== "object") return [];
+    const collected = [];
+
+    const pushEvents = (value) => {
+      if (!Array.isArray(value)) return;
+      for (let i = 0; i < value.length; i += 1) {
+        if (value[i]) collected.push(value[i]);
+      }
+    };
+
+    pushEvents(json.events);
+    pushEvents(json.games);
+
+    if (json.content && typeof json.content === "object") {
+      pushEvents(json.content.events);
+      if (json.content.schedule && typeof json.content.schedule === "object") {
+        pushEvents(json.content.schedule.events);
+        pushEvents(json.content.schedule.items);
+      }
+    }
+
+    if (json.scoreboard && typeof json.scoreboard === "object") {
+      pushEvents(json.scoreboard.events);
+    }
+
+    return collected;
   },
 
   async _fetchNflGames() {
