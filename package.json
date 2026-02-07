@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "description": "MagicMirror module to display today's MLB, NHL, NFL, and NBA scoreboards",
   "main": "MMM-Scores.js",
-  "scripts": {},
+  "scripts": {
+    "test:api": "node scripts/test-api-connections.js"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mrjrask/MMM-Scores.git"

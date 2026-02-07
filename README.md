@@ -49,6 +49,15 @@ Place any custom logos or font files as described below, then add the module to 
 
 ---
 
+## API Connectivity Check
+Use this script to verify that every external API endpoint used by the helper is reachable from your host:
+```bash
+npm run test:api
+```
+The command checks MLB, NHL (all fallback feeds), NFL, NBA, and both Olympic hockey scoreboard endpoints, then exits non-zero if any connection fails.
+
+---
+
 ## Quick Start
 Add this entry to `config/config.js`:
 ```js
