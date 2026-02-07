@@ -986,7 +986,7 @@ module.exports = NodeHelper.create({
 
   async _fetchOlympicHockeyGames(league) {
     try {
-      const { dateIso, dateCompact } = this._getTargetDate();
+      const { dateIso, dateCompact } = this._getTargetDate({ usePreviousDayEarly: false });
       const pathCandidates = league === "olympic_whockey"
         ? ["womens-olympics", "womensolympics", "olympics-women", "olympicswomen", "olympics"]
         : ["mens-olympics", "mensolympics", "olympics-men", "olympicsmen", "olympics"];
@@ -1746,7 +1746,9 @@ module.exports = NodeHelper.create({
     return Array.isArray(leagues) ? leagues : [];
   },
 
-  _getTargetDate() {
+  _getTargetDate(options) {
+    const opts = options && typeof options === "object" ? options : {};
+    const usePreviousDayEarly = opts.usePreviousDayEarly !== false;
     const tz = this.config && this.config.timeZone ? this.config.timeZone : "America/Chicago";
     const now = new Date();
     let dateIso = now.toLocaleDateString("en-CA", { timeZone: tz });
@@ -1761,7 +1763,7 @@ module.exports = NodeHelper.create({
     const m = parseInt(mStr, 10);
 
     // Before 9:30 AM local time, show yesterday's schedule (catch late finishes)
-    if (h < 9 || (h === 9 && m < 30)) {
+    if (usePreviousDayEarly && (h < 9 || (h === 9 && m < 30))) {
       const dt = new Date(dateIso);
       dt.setDate(dt.getDate() - 1);
       dateIso = dt.toISOString().slice(0, 10);
