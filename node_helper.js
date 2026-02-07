@@ -19,6 +19,7 @@ module.exports = NodeHelper.create({
     console.log("🛰️ MMM-Scores helper started");
     this.fetchTimer = null;
     this._nhlStatsDnsStatus = { available: null, checkedAt: 0 };
+    this._nhlStatsRestStatus = { available: null, checkedAt: 0, warnedAt: 0 };
   },
 
   socketNotificationReceived(notification, payload) {
@@ -396,12 +397,19 @@ module.exports = NodeHelper.create({
   },
 
   async _fetchNhlStatsRestGames(dateIso) {
+    if (!this._nhlStatsRestAvailable()) {
+      return [];
+    }
+
     const restUrl = `https://api.nhle.com/stats/rest/en/schedule?cayenneExp=gameDate=%22${dateIso}%22`;
     const res = await fetch(restUrl, { headers: this._nhlRequestHeaders({
       "x-nhl-stats-origin": "https://www.nhl.com",
       "x-nhl-stats-referer": "https://www.nhl.com"
     }) });
     if (!res.ok) {
+      if (res.status === 404) {
+        this._markNhlStatsRestUnavailable();
+      }
       throw new Error(`HTTP ${res.status} ${res.statusText}`);
     }
 
@@ -415,6 +423,30 @@ module.exports = NodeHelper.create({
     }
 
     return this._hydrateNhlGames(normalized);
+  },
+
+  _nhlStatsRestAvailable() {
+    const status = this._nhlStatsRestStatus || {};
+    const now = Date.now();
+    const ttl = 24 * 60 * 60 * 1000;
+    if (status.checkedAt && (now - status.checkedAt) < ttl && status.available === false) {
+      if (!status.warnedAt || (now - status.warnedAt) > ttl) {
+        console.info("ℹ️ NHL stats REST endpoint previously returned 404; skipping REST fallback.");
+        this._nhlStatsRestStatus.warnedAt = now;
+      }
+      return false;
+    }
+
+    return true;
+  },
+
+  _markNhlStatsRestUnavailable() {
+    this._nhlStatsRestStatus = {
+      available: false,
+      checkedAt: Date.now(),
+      warnedAt: Date.now()
+    };
+    console.info("ℹ️ NHL stats REST endpoint returned 404; disabling REST fallback for 24 hours.");
   },
 
   _hydrateNhlGames(games) {
@@ -956,30 +988,41 @@ module.exports = NodeHelper.create({
     try {
       const { dateIso, dateCompact } = this._getTargetDate();
       const pathCandidates = league === "olympic_whockey"
-        ? ["womens-olympics", "womensolympics", "olympics-women", "olympicswomen"]
-        : ["mens-olympics", "mensolympics", "olympics-men", "olympicsmen"];
+        ? ["womens-olympics", "womensolympics", "olympics-women", "olympicswomen", "olympics"]
+        : ["mens-olympics", "mensolympics", "olympics-men", "olympicsmen", "olympics"];
 
       let events = [];
       let lastError = null;
+      const queryCandidates = [
+        `?dates=${dateCompact}`,
+        ""
+      ];
 
       for (let i = 0; i < pathCandidates.length; i += 1) {
         const path = pathCandidates[i];
-        const url = `https://site.api.espn.com/apis/site/v2/sports/hockey/${path}/scoreboard?dates=${dateCompact}`;
+        for (let q = 0; q < queryCandidates.length; q += 1) {
+          const query = queryCandidates[q];
+          const url = `https://site.api.espn.com/apis/site/v2/sports/hockey/${path}/scoreboard${query}`;
 
-        try {
-          const res = await fetch(url);
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status} ${res.statusText}`);
-          }
+          try {
+            const res = await fetch(url);
+            if (!res.ok) {
+              throw new Error(`HTTP ${res.status} ${res.statusText}`);
+            }
 
-          const json = await res.json();
-          const candidateEvents = this._collectEspnScoreboardEvents(json);
-          if (candidateEvents.length > 0 || events.length === 0) {
-            events = candidateEvents;
+            const json = await res.json();
+            const candidateEvents = this._collectEspnScoreboardEvents(json);
+            if (candidateEvents.length > 0 || events.length === 0) {
+              events = candidateEvents;
+            }
+            if (candidateEvents.length > 0) break;
+          } catch (err) {
+            lastError = err;
           }
-          if (candidateEvents.length > 0) break;
-        } catch (err) {
-          lastError = err;
+        }
+
+        if (events.length > 0) {
+          break;
         }
       }
 
