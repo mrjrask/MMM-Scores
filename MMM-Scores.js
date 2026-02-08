@@ -1375,7 +1375,7 @@
             label.classList.add(labelClassEntry);
           }
         }
-        label.textContent = metricLabels[li];
+        label.textContent = this._normalizeMetricLabel(metricLabels[li]);
         header.appendChild(label);
       }
 
@@ -1530,6 +1530,14 @@
       }
 
       return card;
+    },
+
+    _normalizeMetricLabel: function (label) {
+      var text = String(label == null ? "" : label).trim().toLowerCase();
+      if (text === "gold") return "🥇";
+      if (text === "silver") return "🥈";
+      if (text === "bronze") return "🥉";
+      return label;
     },
 
     _createMlbGameCard: function (game) {
