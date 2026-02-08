@@ -1630,12 +1630,13 @@
       var league = forcedLeague || this._getLeague() || "nhl";
       var ls = (game && game.linescore) || {};
       var status = (game && game.status) || {};
-      var state = ((status.abstractGameState || status.detailedState || "") + "").toLowerCase();
+      var statusType = (status && status.type) || {};
+      var state = ((status.abstractGameState || statusType.state || status.detailedState || "") + "").toLowerCase();
       var detailed = status.detailedState || "";
 
       var isPostponed = /postponed/i.test(detailed);
       var isSuspended = /suspended/i.test(detailed);
-      var isPreview = state === "preview" || state === "pre";
+      var isPreview = state === "preview" || state === "pre" || state === "scheduled";
       var isFinal = state === "final";
       var isLive = !isFinal && !isPreview && !isPostponed && !isSuspended;
 
@@ -1647,7 +1648,8 @@
       } else if (isSuspended) {
         statusText = "Suspended";
       } else if (isPreview) {
-        statusText = this._formatStartTime(game && (game.gameDate || game.startTimeUTC));
+        var competitionDate = game && game.competitions && game.competitions[0] && game.competitions[0].date;
+        statusText = this._formatStartTime(game && (game.gameDate || game.startTimeUTC || game.date || competitionDate));
       } else if (isFinal) {
         statusText = detailed || "Final";
       } else if (isLive) {
