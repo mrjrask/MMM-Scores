@@ -1093,11 +1093,18 @@ module.exports = NodeHelper.create({
     const eventList = Array.isArray(events) ? events : [];
     for (let i = 0; i < eventList.length; i += 1) {
       const event = eventList[i] || {};
-      const competition = event && Array.isArray(event.competitions) ? event.competitions[0] : null;
+      const competition = event && Array.isArray(event.competitions)
+        ? event.competitions[0]
+        : (event.competition && typeof event.competition === "object" ? event.competition : null);
       const competitors = competition && Array.isArray(competition.competitors) ? competition.competitors : [];
+      if (competitors.length < 2) continue;
       const homeCompetitor = competitors.find((item) => item && item.homeAway === "home") || competitors[0] || {};
       const awayCompetitor = competitors.find((item) => item && item.homeAway === "away") || competitors[1] || {};
       const status = this._normalizeOlympicStatus(event.status || (competition && competition.status) || {});
+
+      const homeTeam = this._normalizeOlympicTeam(homeCompetitor);
+      const awayTeam = this._normalizeOlympicTeam(awayCompetitor);
+      if (!homeTeam || !awayTeam) continue;
 
       normalized.push({
         leagueKey,
@@ -1111,8 +1118,8 @@ module.exports = NodeHelper.create({
         status: status.status,
         period: status.period,
         clock: status.clock,
-        home: this._normalizeOlympicTeam(homeCompetitor),
-        away: this._normalizeOlympicTeam(awayCompetitor),
+        home: homeTeam,
+        away: awayTeam,
         venue: competition && competition.venue ? (competition.venue.fullName || competition.venue.name || "") : "",
         source: { providerName, fetchedAtUTC }
       });
@@ -1147,6 +1154,7 @@ module.exports = NodeHelper.create({
     const team = (competitor && competitor.team) || {};
     const name = team.displayName || team.shortDisplayName || team.name || competitor.displayName || "";
     const code3 = String(team.abbreviation || team.shortDisplayName || "").trim().toUpperCase().slice(0, 3);
+    if (!name && !code3) return null;
     return {
       code3,
       name,
