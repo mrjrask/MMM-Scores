@@ -1673,8 +1673,40 @@
       else if (isSuspended) cardClasses.push("is-suspended");
 
       var teams = (game && game.teams) || {};
-      var away = teams.away || {};
-      var home = teams.home || {};
+      var away = teams.away || null;
+      var home = teams.home || null;
+
+      if ((!away || !away.team || !home || !home.team) && game && game.competitions && game.competitions[0]) {
+        var competition = game.competitions[0] || {};
+        var competitors = Array.isArray(competition.competitors) ? competition.competitors : [];
+        var compAway = null;
+        var compHome = null;
+
+        for (var ci = 0; ci < competitors.length; ci++) {
+          var competitor = competitors[ci];
+          if (!competitor) continue;
+          var side = (competitor.homeAway || "").toString().toLowerCase();
+          if (side === "away") compAway = competitor;
+          else if (side === "home") compHome = competitor;
+        }
+
+        if (!compAway && competitors.length > 0) compAway = competitors[0];
+        if (!compHome && competitors.length > 1) compHome = competitors[1];
+
+        var toLegacyTeam = function (competitor) {
+          if (!competitor) return {};
+          return {
+            score: competitor.score,
+            team: competitor.team || {}
+          };
+        };
+
+        if ((!away || !away.team) && compAway) away = toLegacyTeam(compAway);
+        if ((!home || !home.team) && compHome) home = toLegacyTeam(compHome);
+      }
+
+      away = away || {};
+      home = home || {};
 
       var awayScore = (typeof away.score !== "undefined") ? away.score : null;
       var homeScore = (typeof home.score !== "undefined") ? home.score : null;
