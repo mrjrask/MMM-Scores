@@ -2,6 +2,7 @@
 const NodeHelper = require("node_helper");
 const fetch      = global.fetch;
 const dns        = require("dns");
+const cheerio    = require("cheerio");
 
 const SUPPORTED_LEAGUES = ["mlb", "nhl", "nfl", "nba", "olympic_mhockey", "olympic_whockey"];
 
@@ -1050,8 +1051,14 @@ module.exports = NodeHelper.create({
       }
 
       const events = this._normalizedGamesToLegacyEvents(normalizedGames);
+      const medalRows = await this._fetchOlympicMedalRows();
       console.log(`🥅 Sending ${events.length} ${leagueKey} games for ${dateIso} to front-end via ${providerUsed}.`);
       this._notifyGames(leagueKey, events, {
+        olympicMedals: {
+          season: "winter",
+          year: 2026,
+          rows: medalRows
+        },
         olympicDiagnostics: {
           providerUsed,
           fetchedAtUTC: new Date().toISOString(),
@@ -1064,6 +1071,80 @@ module.exports = NodeHelper.create({
       const fallbackGames = Array.isArray(this._olympicLastGoodByLeague[leagueKey]) ? this._olympicLastGoodByLeague[leagueKey] : [];
       this._notifyGames(leagueKey, this._normalizedGamesToLegacyEvents(fallbackGames));
     }
+  },
+
+  async _fetchOlympicMedalRows() {
+    const limitRaw = parseInt(this.config && this.config.olympicMedalRows, 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? limitRaw : 10;
+    const cache = this._getProviderCache("espn_olympic_medals", "winter", "2026");
+    if (Array.isArray(cache) && cache.length > 0) return cache.slice(0, limit);
+
+    const urls = [
+      "https://www.espn.com/olympics/winter/2026/medals",
+      "https://www.espn.com/olympics/winter/_/year/2026/medals"
+    ];
+
+    for (let i = 0; i < urls.length; i += 1) {
+      try {
+        const res = await fetch(urls[i], { headers: this._nhlRequestHeaders() });
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+        const html = await res.text();
+        const rows = this._parseEspnOlympicMedalRows(html, limit);
+        if (rows.length > 0) {
+          this._setProviderCache("espn_olympic_medals", "winter", "2026", rows);
+          return rows;
+        }
+      } catch (error) {
+        if (i === urls.length - 1) {
+          console.warn("⚠️ Olympic medal standings fetch failed:", error.message || error);
+        }
+      }
+    }
+
+    return [];
+  },
+
+  _parseEspnOlympicMedalRows(html, limit) {
+    if (!html || typeof html !== "string") return [];
+
+    const $ = cheerio.load(html);
+    const table = $("table").filter((index, el) => {
+      const headers = $(el).find("thead th").map((i, th) => $(th).text().trim().toLowerCase()).get();
+      return headers.some((label) => label.includes("gold"))
+        && headers.some((label) => label.includes("silver"))
+        && headers.some((label) => label.includes("bronze"))
+        && headers.some((label) => label.includes("total"));
+    }).first();
+
+    if (!table.length) return [];
+
+    const rows = [];
+    table.find("tbody tr").each((index, row) => {
+      if (index >= limit) return false;
+
+      const $row = $(row);
+      const cells = $row.find("th,td");
+      const country = $row.find(".country_name--long").first().text().trim() || cells.eq(1).text().trim();
+      const abbreviation = $row.find(".country_name--abbrev").first().text().trim() || country.slice(0, 3).toUpperCase();
+      if (!country) return;
+
+      const gold = $row.find("td").eq(0).text().trim();
+      const silver = $row.find("td").eq(1).text().trim();
+      const bronze = $row.find("td").eq(2).text().trim();
+      const total = $row.find("td").eq(3).text().trim();
+
+      rows.push({
+        country,
+        abbreviation,
+        img: $row.find(".team-logo, img").first().attr("src") || "",
+        gold,
+        silver,
+        bronze,
+        total
+      });
+    });
+
+    return rows;
   },
 
   async fetchOlympicScoreboardMen(dateIso, dateCompact) {
