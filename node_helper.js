@@ -1992,7 +1992,33 @@ module.exports = NodeHelper.create({
     const cfg = this.config || {};
     const source = (typeof cfg.leagues !== "undefined") ? cfg.leagues : cfg.league;
     const leagues = this._coerceLeagueArray(source);
-    return Array.isArray(leagues) ? leagues : [];
+    if (!Array.isArray(leagues)) return [];
+    return this._filterSeasonalLeagues(leagues);
+  },
+
+  _todayIsoInTimeZone() {
+    const tz = this.config && this.config.timeZone ? this.config.timeZone : "America/Chicago";
+    return new Date().toLocaleDateString("en-CA", { timeZone: tz });
+  },
+
+  _isNhlBreakWindow(dateIso) {
+    return dateIso >= "2026-02-06" && dateIso <= "2026-02-24";
+  },
+
+  _hideOlympicScoreboards(dateIso) {
+    return dateIso >= "2026-02-24";
+  },
+
+  _filterSeasonalLeagues(leagues) {
+    const dateIso = this._todayIsoInTimeZone();
+    const hideNhl = this._isNhlBreakWindow(dateIso);
+    const hideOlympics = this._hideOlympicScoreboards(dateIso);
+
+    return leagues.filter((league) => {
+      if (hideNhl && league === "nhl") return false;
+      if (hideOlympics && (league === "olympic_mhockey" || league === "olympic_whockey")) return false;
+      return true;
+    });
   },
 
   _getTargetDate(options) {

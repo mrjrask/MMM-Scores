@@ -405,7 +405,33 @@
       var cfg = this.config || {};
       var source = (typeof cfg.leagues !== "undefined") ? cfg.leagues : cfg.league;
       var leagues = this._coerceLeagueArray(source);
-      return Array.isArray(leagues) ? leagues : [];
+      if (!Array.isArray(leagues)) return [];
+      return this._filterSeasonalLeagues(leagues);
+    },
+
+    _todayIsoInTimeZone: function () {
+      var tz = (this.config && this.config.timeZone) ? this.config.timeZone : "America/Chicago";
+      return new Date().toLocaleDateString("en-CA", { timeZone: tz });
+    },
+
+    _isNhlBreakWindow: function (dateIso) {
+      return dateIso >= "2026-02-06" && dateIso <= "2026-02-24";
+    },
+
+    _hideOlympicScoreboards: function (dateIso) {
+      return dateIso >= "2026-02-24";
+    },
+
+    _filterSeasonalLeagues: function (leagues) {
+      var dateIso = this._todayIsoInTimeZone();
+      var hideNhl = this._isNhlBreakWindow(dateIso);
+      var hideOlympics = this._hideOlympicScoreboards(dateIso);
+
+      return leagues.filter(function (league) {
+        if (hideNhl && league === "nhl") return false;
+        if (hideOlympics && (league === "olympic_mhockey" || league === "olympic_whockey")) return false;
+        return true;
+      });
     },
 
     _buildHelperConfig: function () {
