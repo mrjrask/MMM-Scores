@@ -78,6 +78,9 @@ module.exports = NodeHelper.create({
       const { dateIso } = this._getTargetDate();
       const url  = `https://statsapi.mlb.com/api/v1/schedule/games?sportId=1&date=${dateIso}&hydrate=linescore`;
       const res  = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      }
       const json = await res.json();
       const games = (json.dates && json.dates[0] && json.dates[0].games) || [];
 
@@ -85,6 +88,7 @@ module.exports = NodeHelper.create({
       this._notifyGames("mlb", games);
     } catch (e) {
       console.error("🚨 MLB fetchGames failed:", e);
+      this._notifyGames("mlb", []);
     }
   },
 
@@ -1687,6 +1691,7 @@ module.exports = NodeHelper.create({
       this._notifyGames("nfl", games, extras);
     } catch (e) {
       console.error("🚨 NFL fetchGames failed:", e);
+      this._notifyGames("nfl", [], { teamsOnBye: [] });
     }
   },
 
