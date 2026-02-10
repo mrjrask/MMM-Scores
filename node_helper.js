@@ -1,8 +1,65 @@
 // node_helper.js
 const NodeHelper = require("node_helper");
-const fetch      = global.fetch;
 const dns        = require("dns");
 const cheerio    = require("cheerio");
+const http       = require("http");
+const https      = require("https");
+const { URL }    = require("url");
+
+function createHttpFetchFallback(maxRedirects = 5) {
+  const requestOnce = (url, options, redirectsLeft) => new Promise((resolve, reject) => {
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch (error) {
+      reject(error);
+      return;
+    }
+
+    const transport = parsed.protocol === "https:" ? https : http;
+    const req = transport.request(parsed, {
+      method: (options && options.method) || "GET",
+      headers: (options && options.headers) || {}
+    }, (res) => {
+      const status = Number(res.statusCode) || 0;
+      const location = res.headers && res.headers.location;
+
+      if (status >= 300 && status < 400 && location && redirectsLeft > 0) {
+        const redirectUrl = new URL(location, parsed).toString();
+        res.resume();
+        resolve(requestOnce(redirectUrl, options, redirectsLeft - 1));
+        return;
+      }
+
+      const chunks = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => {
+        const body = Buffer.concat(chunks).toString("utf8");
+        const response = {
+          ok: status >= 200 && status < 300,
+          status,
+          statusText: res.statusMessage || "",
+          headers: res.headers || {},
+          text: async () => body,
+          json: async () => JSON.parse(body)
+        };
+        resolve(response);
+      });
+    });
+
+    req.on("error", reject);
+
+    const body = options && options.body;
+    if (typeof body !== "undefined" && body !== null) req.write(body);
+    req.end();
+  });
+
+  return (url, options) => requestOnce(url, options, maxRedirects);
+}
+
+const fetch = (typeof global.fetch === "function")
+  ? global.fetch.bind(global)
+  : createHttpFetchFallback();
 
 const SUPPORTED_LEAGUES = ["mlb", "nhl", "nfl", "nba", "olympic_mhockey", "olympic_whockey"];
 
