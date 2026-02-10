@@ -93,7 +93,7 @@ Every option may be declared globally, as an object keyed by league (`{ mlb: val
 | `league` / `leagues` | `string \| string[]` | `"mlb"` | League(s) to display. Accepts `"mlb"`, `"nhl"`, `"nfl"`, `"nba"`, `"olympic_mhockey"`, `"olympic_whockey"`, or `"all"`. Arrays define the rotation order. |
 | `updateIntervalScores` | `number` | `60000` | Milliseconds between helper fetches. Minimum enforced interval is 10 seconds. |
 | `rotateIntervalScores` | `number` | `15000` | Milliseconds between scoreboard page rotations. |
-| `timeZone` | `string` | `"America/Chicago"` | Time zone used to decide the scoreboard date (requests the previous day before 09:30 local). |
+| `timeZone` | `string` | `"America/Chicago"` | Time zone used to decide the scoreboard date (all leagues use previous day before 09:30 local, Olympics use previous day before 03:00 local). |
 | `providerCacheMs` | `number` | `20000` | Per-provider/per-date Olympic provider cache TTL in milliseconds (minimum 15000). |
 | `scoreboardColumns` | `number` | auto | Columns per page. Defaults to 2 for MLB (capped at 2) and 4 for NHL/NFL/NBA/Olympic hockey. |
 | `gamesPerColumn` (`scoreboardRows`) | `number` | auto | Games stacked in each column (4 for all leagues unless overridden). |
