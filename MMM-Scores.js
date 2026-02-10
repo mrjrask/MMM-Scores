@@ -181,8 +181,6 @@
       highlightedTeams_olympic_whockey: [],
       highlightedTeams_oly_mhockey:     [],
       highlightedTeams_oly_whockey:     [],
-      showOlympicMedals:               true,
-      olympicMedalRows:                10,
       showTitle:                        true,
       useTimesSquareFont:               true,
 
@@ -193,9 +191,6 @@
     getHeader: function () {
       if (!this.config.showTitle) return null;
       var league = this._getLeague();
-      if ((league === "olympic_mhockey" || league === "olympic_whockey") && this._isOlympicMedalsScreen()) {
-        return "Olympic Medal Count";
-      }
       if (league === "mlb") return "MLB Scoreboard";
       if (league === "nhl") return "NHL Scoreboard";
       if (league === "nfl") return "NFL Scoreboard";
@@ -422,22 +417,6 @@
       payload.activeLeague = this._getLeague();
       return payload;
     },
-
-
-    _hasOlympicMedalRows: function () {
-      var league = this._getLeague();
-      if (league !== "olympic_mhockey" && league !== "olympic_whockey") return false;
-      if (this.config.showOlympicMedals === false) return false;
-      var extras = this.currentExtras;
-      var medals = extras && extras.olympicMedals;
-      var rows = medals && Array.isArray(medals.rows) ? medals.rows : [];
-      return rows.length > 0;
-    },
-
-    _isOlympicMedalsScreen: function () {
-      var scoreboardPages = this._scoreboardPageCount || 0;
-      return this._hasOlympicMedalRows() && this.currentScreen === scoreboardPages;
-    },
     _applyActiveLeagueState: function () {
       this._syncScoreboardLayout();
       var league = this._getLeague();
@@ -459,7 +438,6 @@
       this._scoreboardPageCount = scoreboardPages;
 
       var totalPages = scoreboardPages;
-      if (this._hasOlympicMedalRows()) totalPages += 1;
       if (totalPages === 0) totalPages = 1;
 
       this.totalGamePages = totalPages;
@@ -1196,14 +1174,6 @@
         scoreboardRendered = true;
       }
 
-
-      if (!scoreboardRendered && this._isOlympicMedalsScreen()) {
-        var medalScreen = this._buildOlympicMedalScreen();
-        if (medalScreen) {
-          container.appendChild(medalScreen);
-          scoreboardRendered = true;
-        }
-      }
       if (scoreboardRendered && activeLeague === "nfl") {
         var extras = this.currentExtras;
         var byeTeams = extras && Array.isArray(extras.teamsOnBye) ? extras.teamsOnBye : [];
@@ -1346,63 +1316,6 @@
       return section;
     },
 
-
-    _buildOlympicMedalScreen: function () {
-      var extras = this.currentExtras;
-      var medalData = extras && extras.olympicMedals;
-      var rows = medalData && Array.isArray(medalData.rows) ? medalData.rows : [];
-      if (rows.length === 0) return null;
-
-      var wrap = document.createElement("div");
-      wrap.className = "olympic-medals-screen small";
-
-      var table = document.createElement("table");
-      table.className = "olympic-medals-table small";
-
-      var thead = document.createElement("thead");
-      var headerRow = document.createElement("tr");
-      ["#", "Country", "🥇", "🥈", "🥉", "Total"].forEach(function (label) {
-        var th = document.createElement("th");
-        th.textContent = label;
-        headerRow.appendChild(th);
-      });
-      thead.appendChild(headerRow);
-      table.appendChild(thead);
-
-      var tbody = document.createElement("tbody");
-      for (var i = 0; i < rows.length; i++) {
-        var row = rows[i] || {};
-        var tr = document.createElement("tr");
-
-        var rank = document.createElement("td");
-        rank.textContent = String(i + 1);
-        tr.appendChild(rank);
-
-        var countryCell = document.createElement("td");
-        countryCell.className = "olympic-country-cell";
-        var img = document.createElement("img");
-        img.className = "olympic-country-logo";
-        img.src = row.img || "";
-        img.alt = row.abbreviation || row.country || "";
-        img.onerror = (function (el) { return function () { el.style.display = "none"; }; })(img);
-        countryCell.appendChild(img);
-        var txt = document.createElement("span");
-        txt.textContent = row.country || row.abbreviation || "";
-        countryCell.appendChild(txt);
-        tr.appendChild(countryCell);
-
-        [row.gold, row.silver, row.bronze, row.total].forEach(function (v) {
-          var td = document.createElement("td");
-          td.textContent = v || "0";
-          tr.appendChild(td);
-        });
-
-        tbody.appendChild(tr);
-      }
-      table.appendChild(tbody);
-      wrap.appendChild(table);
-      return wrap;
-    },
     createGameBox: function (game) {
       var league = this._getLeague();
       if (league === "nhl") return this._createNhlGameCard(game);
