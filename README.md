@@ -21,7 +21,7 @@ A MagicMirror² module that cycles through MLB, NHL, NFL, NBA, and Olympic Ice H
 ---
 
 ## Features
-- **Six-league scoreboards plus Olympic medal standings**: MLB (R/H/E linescore), NHL (goals & shots), NFL (quarter-by-quarter totals plus bye list), NBA (quarter/OT breakdown), Men's Olympic Hockey, and Women's Olympic Hockey.
+- **Six-league scoreboards**: MLB (R/H/E linescore), NHL (goals & shots), NFL (quarter-by-quarter totals plus bye list), NBA (quarter/OT breakdown), Men's Olympic Hockey, and Women's Olympic Hockey.
 - **Automatic league rotation**: Show a single league, a custom sequence, or all supported leagues with timed page flips.
 - **Flexible layout**: Control columns, rows, or total games per page per league and scale everything with a single `layoutScale` value.
 - **Favorite team highlighting**: Per-league highlight lists add a subtle accent to matching teams on scoreboards.
@@ -95,8 +95,6 @@ Every option may be declared globally, as an object keyed by league (`{ mlb: val
 | `rotateIntervalScores` | `number` | `15000` | Milliseconds between scoreboard page rotations. |
 | `timeZone` | `string` | `"America/Chicago"` | Time zone used to decide the scoreboard date (requests the previous day before 09:30 local). |
 | `providerCacheMs` | `number` | `20000` | Per-provider/per-date Olympic provider cache TTL in milliseconds (minimum 15000). |
-| `showOlympicMedals` | `boolean` | `true` | Adds an Olympic Medal Count screen after Olympic hockey game pages when medal data is available. |
-| `olympicMedalRows` | `number` | `10` | Number of countries to show on the Olympic medal standings screen. |
 | `scoreboardColumns` | `number` | auto | Columns per page. Defaults to 2 for MLB (capped at 2) and 4 for NHL/NFL/NBA/Olympic hockey. |
 | `gamesPerColumn` (`scoreboardRows`) | `number` | auto | Games stacked in each column (4 for all leagues unless overridden). |
 | `gamesPerPage` | `number` | derived | Override the total games per page; rows adjust automatically per league. |
@@ -164,7 +162,6 @@ Scoreboard data comes from league-specific feeds with fallbacks where needed.
 - **NFL scores**: Weekly schedules from `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=<YYYYMMDD>` aggregated across the current week; includes bye-week teams.
 - **Men's Olympic hockey scores**: Primary `https://site.api.espn.com/apis/site/v2/sports/hockey/mens-olympics/scoreboard?dates=<YYYYMMDD>` with resilient provider-chain hooks (`olympics.com`, IIHF, TheSportsDB, Wikipedia/Wikidata finals) and last-good-data fallback.
 - **Women's Olympic hockey scores**: Primary `https://site.api.espn.com/apis/site/v2/sports/hockey/womens-olympics/scoreboard?dates=<YYYYMMDD>` with the same provider-chain/fallback architecture.
-- **Olympic medal standings**: Parsed from ESPN's Winter Olympics medals page and rendered as a compact small-style table.
 
 ---
 
