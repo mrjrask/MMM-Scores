@@ -1067,7 +1067,7 @@ module.exports = NodeHelper.create({
       ];
 
     try {
-      const { dateIso, dateCompact } = this._getTargetDate();
+      const { dateIso, dateCompact } = this._getTargetDate({ previousDayCutoffMinutes: 3 * 60 });
       let normalizedGames = [];
       let providerUsed = "none";
 
@@ -2024,6 +2024,9 @@ module.exports = NodeHelper.create({
   _getTargetDate(options) {
     const opts = options && typeof options === "object" ? options : {};
     const usePreviousDayEarly = opts.usePreviousDayEarly !== false;
+    const cutoffMinutes = Number.isFinite(opts.previousDayCutoffMinutes)
+      ? opts.previousDayCutoffMinutes
+      : ((Number.isFinite(opts.previousDayCutoffHour) ? opts.previousDayCutoffHour * 60 : 9 * 60 + 30));
     const tz = this.config && this.config.timeZone ? this.config.timeZone : "America/Chicago";
     const now = new Date();
     let dateIso = now.toLocaleDateString("en-CA", { timeZone: tz });
@@ -2037,8 +2040,9 @@ module.exports = NodeHelper.create({
     const h = parseInt(hStr, 10);
     const m = parseInt(mStr, 10);
 
-    // Before 9:30 AM local time, show yesterday's schedule (catch late finishes)
-    if (usePreviousDayEarly && (h < 9 || (h === 9 && m < 30))) {
+    // Before the configured local cutoff, show yesterday's schedule (catch late finishes)
+    const currentMinutes = (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+    if (usePreviousDayEarly && currentMinutes < cutoffMinutes) {
       const dt = new Date(dateIso);
       dt.setDate(dt.getDate() - 1);
       dateIso = dt.toISOString().slice(0, 10);
