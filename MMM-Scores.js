@@ -1452,11 +1452,8 @@
         abbrEl.className = "scoreboard-team-abbr";
         if (league === "mlb" && abbr === "CUBS") {
           abbrEl.classList.add("scoreboard-team-abbr-cubs");
-          abbrEl.dataset.suffix = "S";
-          abbrEl.textContent = "CUB";
-        } else {
-          abbrEl.textContent = abbr;
         }
+        abbrEl.textContent = abbr;
         team.appendChild(abbrEl);
 
         if (rowData.possessionIcon) {
