@@ -1442,10 +1442,10 @@
         if (logoAbbr) {
           logo.src = this.getLogoUrl(logoAbbr);
         } else {
-          logo.style.display = "none";
+          logo.classList.add("logo-missing");
         }
         logo.alt = abbr;
-        logo.onerror = (function (imgEl) { return function () { imgEl.style.display = "none"; }; })(logo);
+        logo.onerror = (function (imgEl) { return function () { imgEl.classList.add("logo-missing"); }; })(logo);
         team.appendChild(logo);
 
         var abbrEl = document.createElement("span");
