@@ -306,6 +306,10 @@
   font-weight: 600;
 }
 
+.scoreboard-card.league-mlb .scoreboard-label {
+  letter-spacing: 0;
+}
+
 .scoreboard-card.league-nhl .scoreboard-label,
 .scoreboard-card.league-olympic_mhockey .scoreboard-label,
 .scoreboard-card.league-olympic_whockey .scoreboard-label {
@@ -436,6 +440,15 @@
   color: var(--scoreboard-text);
   line-height: 1;
   font-weight: 700;
+}
+
+.scoreboard-card.league-mlb .scoreboard-header,
+.scoreboard-card.league-mlb .scoreboard-row {
+  column-gap: calc(var(--scoreboard-gap) * 0.4);
+}
+
+.scoreboard-card.league-mlb .scoreboard-status {
+  overflow: visible;
 }
 
 .scoreboard-card .scoreboard-value.live {
