@@ -247,32 +247,6 @@
 }
 
 
-.scoreboard-card.league-mlb .scoreboard-header {
-  grid-template-rows: auto auto;
-  row-gap: calc(var(--scoreboard-gap) * 0.3);
-  padding-bottom: calc(var(--scoreboard-pad-block) * 0.6);
-}
-
-.scoreboard-card.league-mlb .scoreboard-header .scoreboard-status {
-  grid-column: 1 / -1;
-  grid-row: 1;
-}
-
-.scoreboard-card.league-mlb .scoreboard-header .scoreboard-label:nth-child(2) {
-  grid-column: 2;
-  grid-row: 2;
-}
-
-.scoreboard-card.league-mlb .scoreboard-header .scoreboard-label:nth-child(3) {
-  grid-column: 3;
-  grid-row: 2;
-}
-
-.scoreboard-card.league-mlb .scoreboard-header .scoreboard-label:nth-child(4) {
-  grid-column: 4;
-  grid-row: 2;
-}
-
 .scoreboard-card .scoreboard-status {
   font-size: calc(var(--scoreboard-status-font) + 1pt);
   letter-spacing: 0.08em;
@@ -393,6 +367,10 @@
   flex-shrink: 0;
 }
 
+.scoreboard-card .scoreboard-team-logo.logo-missing {
+  visibility: hidden;
+}
+
 .scoreboard-card .scoreboard-team-logo[src*="/SD.png"],
 .scoreboard-card .scoreboard-team-logo[src*="/MIN.png"],
 .scoreboard-card .scoreboard-team-logo[src*="/NYY.png"],
@@ -427,7 +405,9 @@
 }
 
 .scoreboard-card.league-mlb .scoreboard-team-abbr {
-  min-width: 4.5ch;
+  width: 5ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .scoreboard-card.league-nhl .scoreboard-team-abbr,
