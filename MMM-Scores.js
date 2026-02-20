@@ -1450,6 +1450,9 @@
 
         var abbrEl = document.createElement("span");
         abbrEl.className = "scoreboard-team-abbr";
+        if (league === "mlb" && abbr === "CUBS") {
+          abbrEl.classList.add("scoreboard-team-abbr-cubs");
+        }
         abbrEl.textContent = abbr;
         team.appendChild(abbrEl);
 
