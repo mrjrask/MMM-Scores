@@ -17,6 +17,16 @@
     "Athletics": "ATH","Seattle Mariners": "SEA","Texas Rangers": "TEX"
   };
 
+  var MLB_ABBREVIATION_STOP_WORDS = {
+    "and": true,
+    "at": true,
+    "college": true,
+    "of": true,
+    "the": true,
+    "university": true,
+    "vs": true
+  };
+
 
 
   var OLYMPIC_COUNTRY_ABBREVIATIONS = {
@@ -2419,7 +2429,16 @@
       league = (league || this._getLeague() || "").toLowerCase();
 
       if (league === "mlb") {
-        abbr = MLB_ABBREVIATIONS[name] || team.abbreviation || team.teamAbbreviation || team.triCode || "";
+        abbr = MLB_ABBREVIATIONS[name]
+          || team.abbreviation
+          || team.teamAbbreviation
+          || team.triCode
+          || team.shortName
+          || team.fileCode
+          || team.clubName
+          || team.teamCode
+          || this._deriveMlbFallbackAbbreviation(team)
+          || "";
       } else if (league === "nhl") {
         abbr = team.teamAbbreviation || team.abbreviation || team.triCode || team.shortName || name;
       } else if (league === "olympic_mhockey" || league === "olympic_whockey") {
@@ -2448,6 +2467,60 @@
 
       if (!abbr && typeof team.abbreviation === "string") abbr = team.abbreviation;
       return (abbr || "").toString().toUpperCase();
+    },
+
+    _deriveMlbFallbackAbbreviation: function (team) {
+      if (!team) return "";
+
+      var candidates = [
+        team.shortDisplayName,
+        team.displayName,
+        team.teamName,
+        team.name,
+        team.locationName,
+        team.clubName,
+        team.franchiseName
+      ];
+
+      for (var i = 0; i < candidates.length; i++) {
+        var candidate = candidates[i];
+        if (typeof candidate !== "string") continue;
+        var abbr = this._deriveAbbreviationFromTeamName(candidate);
+        if (abbr) return abbr;
+      }
+
+      return "";
+    },
+
+    _deriveAbbreviationFromTeamName: function (name) {
+      if (typeof name !== "string") return "";
+      var cleaned = name.trim();
+      if (!cleaned) return "";
+
+      var words = cleaned
+        .replace(/[^A-Za-z0-9 ]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .split(" ");
+
+      if (!words.length) return "";
+
+      if (words.length >= 3 && words[0].toLowerCase() === "university" && words[1].toLowerCase() === "of") {
+        return ("U" + words[2].charAt(0)).toUpperCase();
+      }
+
+      var letters = "";
+      for (var i = 0; i < words.length; i++) {
+        var lower = words[i].toLowerCase();
+        if (!MLB_ABBREVIATION_STOP_WORDS[lower]) {
+          letters += words[i].charAt(0);
+        }
+      }
+
+      if (letters.length >= 2) return letters.substring(0, 4).toUpperCase();
+      if (words.length >= 2) return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase();
+
+      return words[0].substring(0, 4).toUpperCase();
     },
 
     _isHighlighted: function (abbr) {
