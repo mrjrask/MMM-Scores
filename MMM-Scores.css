@@ -414,6 +414,19 @@
   text-overflow: ellipsis;
 }
 
+.scoreboard-card.league-mlb .scoreboard-team-abbr.scoreboard-team-abbr-cubs {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.scoreboard-card.league-mlb .scoreboard-team-abbr.scoreboard-team-abbr-cubs::after {
+  content: attr(data-suffix);
+  position: absolute;
+  left: 100%;
+  top: 0;
+  transform: translateX(-0.26em);
+}
+
 .scoreboard-card.league-nhl .scoreboard-team-abbr,
 .scoreboard-card.league-olympic_mhockey .scoreboard-team-abbr,
 .scoreboard-card.league-olympic_whockey .scoreboard-team-abbr {
