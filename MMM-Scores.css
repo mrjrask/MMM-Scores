@@ -346,6 +346,12 @@
   padding-right: var(--scoreboard-nhl-abbr-metric-gap);
 }
 
+.scoreboard-card.league-nhl .scoreboard-team {
+  grid-template-columns: calc(var(--scoreboard-team-font) * 1.2) minmax(3ch, 1fr) auto;
+  column-gap: calc(var(--scoreboard-nhl-logo-abbr-gap) * 1.25);
+  padding-right: calc(var(--scoreboard-nhl-abbr-metric-gap) * 1.35);
+}
+
 .scoreboard-card .scoreboard-team-total {
   font-size: calc(var(--scoreboard-value-font) + 1pt);
   font-weight: 700;
@@ -424,6 +430,13 @@
 .scoreboard-card.league-olympic_whockey .scoreboard-team-abbr {
   justify-self: start;
   width: 100%;
+}
+
+.scoreboard-card.league-nhl .scoreboard-team-total {
+  margin-left: 0;
+  justify-self: end;
+  min-width: 2ch;
+  text-align: right;
 }
 
 .scoreboard-card .scoreboard-team-abbr .scoreboard-possession-icon {
