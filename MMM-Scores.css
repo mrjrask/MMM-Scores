@@ -399,9 +399,10 @@
 .scoreboard-card.league-nhl .scoreboard-team-logo[src*="/WSH.png"],
 .scoreboard-card.league-olympic_mhockey .scoreboard-team-logo[src*="/WSH.png"],
 .scoreboard-card.league-olympic_whockey .scoreboard-team-logo[src*="/WSH.png"] {
-  height: calc(var(--scoreboard-team-font) * 0.9856);
-  width: auto;
-  max-height: calc(var(--scoreboard-team-font) * 1.1088);
+  height: calc(var(--scoreboard-team-font) * 0.9);
+  width: calc(var(--scoreboard-team-font) * 0.95);
+  max-height: calc(var(--scoreboard-team-font) * 1.02);
+  max-width: calc(var(--scoreboard-team-font) * 0.95);
 }
 
 .scoreboard-card .scoreboard-team-abbr {
@@ -439,6 +440,10 @@
   text-align: right;
 }
 
+.scoreboard-card.league-nba .scoreboard-value {
+  text-align: right;
+}
+
 .scoreboard-card .scoreboard-team-abbr .scoreboard-possession-icon {
   position: absolute;
   top: 50%;
@@ -462,7 +467,15 @@
 
 .scoreboard-card.league-mlb .scoreboard-header,
 .scoreboard-card.league-mlb .scoreboard-row {
-  column-gap: calc(var(--scoreboard-gap) * 0.4);
+  column-gap: calc(var(--scoreboard-gap) * 0.24);
+}
+
+.scoreboard-card.league-mlb .scoreboard-header {
+  padding-bottom: calc(var(--scoreboard-pad-block) * 0.7);
+}
+
+.scoreboard-card.league-mlb .scoreboard-row:first-child {
+  padding-top: calc(var(--scoreboard-pad-block) * 0.7);
 }
 
 .scoreboard-card.league-mlb .scoreboard-status {
