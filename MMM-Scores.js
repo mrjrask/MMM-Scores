@@ -27,6 +27,30 @@
     "vs": true
   };
 
+  var MLB_LOGO_FILE_ALIASES = {
+    "AUS": "Australia",
+    "BRA": "Brazil",
+    "CAN": "Canada",
+    "COL": "Colombia",
+    "CUB": "Cuba",
+    "CZE": "Czech Republic",
+    "DOM": "Dominican Republic",
+    "GBR": "Great Britain",
+    "ISR": "Israel",
+    "ITA": "Italy",
+    "JPN": "Japan",
+    "KOR": "South Korea",
+    "MEX": "Mexico",
+    "NCA": "Nicaragua",
+    "NED": "Kingdom of the Netherlands",
+    "PAN": "Panama",
+    "PUR": "Puerto Rico",
+    "TPE": "Chinese Taipei",
+    "TWN": "Chinese Taipei",
+    "USA": "United States",
+    "VEN": "Venezuela"
+  };
+
 
 
   var OLYMPIC_COUNTRY_ABBREVIATIONS = {
@@ -2563,7 +2587,9 @@
       } else if (league === "nba") {
         path = "images/nba/" + String(abbr || "").toUpperCase() + ".png";
       } else {
-        path = "images/mlb/" + String(abbr || "").toUpperCase() + ".png";
+        var mlbAbbr = String(abbr || "").toUpperCase();
+        var mlbLogoFile = MLB_LOGO_FILE_ALIASES[mlbAbbr] || mlbAbbr;
+        path = "images/mlb/" + mlbLogoFile + ".png";
       }
       return this.file(path);
     }
