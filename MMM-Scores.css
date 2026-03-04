@@ -274,9 +274,14 @@
   z-index: 1;
   flex-wrap: nowrap;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
   padding-right: calc(var(--scoreboard-gap) * 0.5);
+}
+
+.scoreboard-card.league-nhl .scoreboard-header,
+.scoreboard-card.league-olympic_mhockey .scoreboard-header,
+.scoreboard-card.league-olympic_whockey .scoreboard-header {
+  grid-template-columns: 1fr;
 }
 
 .scoreboard-card.league-nhl .scoreboard-header,
@@ -467,7 +472,7 @@
 
 .scoreboard-card.league-mlb .scoreboard-header,
 .scoreboard-card.league-mlb .scoreboard-row {
-  column-gap: calc(var(--scoreboard-gap) * 0.24);
+  column-gap: calc(var(--scoreboard-gap) * 0.18);
 }
 
 .scoreboard-card.league-mlb .scoreboard-header {
