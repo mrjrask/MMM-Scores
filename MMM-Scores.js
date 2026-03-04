@@ -27,11 +27,46 @@
     "vs": true
   };
 
+  var MLB_INTERNATIONAL_ABBREVIATIONS_BY_TEAM_ID = {
+    784: "CAN",
+    792: "COL",
+    878: "NED",
+    881: "NCA",
+    890: "PAN",
+    897: "PUR",
+    840: "ISR",
+    805: "DOM",
+    776: "BRA",
+    798: "CUB",
+    867: "MEX",
+    821: "GBR",
+    841: "ITA",
+    940: "USA",
+    944: "VEN"
+  };
+
+  var MLB_INTERNATIONAL_LOGO_FILES_BY_TEAM_ID = {
+    784: "Canada",
+    792: "Colombia",
+    878: "Kingdom of the Netherlands",
+    881: "Nicaragua",
+    890: "Panama",
+    897: "Puerto Rico",
+    840: "Israel",
+    805: "Dominican Republic",
+    776: "Brazil",
+    798: "Cuba",
+    867: "Mexico",
+    821: "Great Britain",
+    841: "Italy",
+    940: "United States",
+    944: "Venezuela"
+  };
+
   var MLB_LOGO_FILE_ALIASES = {
     "AUS": "Australia",
     "BRA": "Brazil",
     "CAN": "Canada",
-    "COL": "Colombia",
     "CUB": "Cuba",
     "CZE": "Czech Republic",
     "DOM": "Dominican Republic",
@@ -1673,7 +1708,7 @@
         var row = {
           type: (i === 0) ? "away" : "home",
           abbr: abbr,
-          logoAbbr: abbr,
+          logoAbbr: this._mlbLogoAbbrForTeam(t.team, abbr),
           highlight: highlight,
           isLoser: isLoser,
           metrics: [
@@ -2456,7 +2491,12 @@
       league = (league || this._getLeague() || "").toLowerCase();
 
       if (league === "mlb") {
-        abbr = MLB_ABBREVIATIONS[name]
+        var teamId = parseInt(team.id, 10);
+        var intlAbbr = Number.isFinite(teamId)
+          ? MLB_INTERNATIONAL_ABBREVIATIONS_BY_TEAM_ID[teamId]
+          : "";
+        abbr = intlAbbr
+          || MLB_ABBREVIATIONS[name]
           || team.abbreviation
           || team.teamAbbreviation
           || team.triCode
@@ -2517,6 +2557,15 @@
       }
 
       return "";
+    },
+
+    _mlbLogoAbbrForTeam: function (team, fallbackAbbr) {
+      var teamId = parseInt(team && team.id, 10);
+      if (Number.isFinite(teamId)) {
+        var intlLogoFile = MLB_INTERNATIONAL_LOGO_FILES_BY_TEAM_ID[teamId];
+        if (intlLogoFile) return intlLogoFile;
+      }
+      return fallbackAbbr;
     },
 
     _deriveAbbreviationFromTeamName: function (name) {
@@ -2587,8 +2636,9 @@
       } else if (league === "nba") {
         path = "images/nba/" + String(abbr || "").toUpperCase() + ".png";
       } else {
-        var mlbAbbr = String(abbr || "").toUpperCase();
-        var mlbLogoFile = MLB_LOGO_FILE_ALIASES[mlbAbbr] || mlbAbbr;
+        var mlbLogoRaw = String(abbr || "").trim();
+        var mlbAbbr = mlbLogoRaw.toUpperCase();
+        var mlbLogoFile = MLB_LOGO_FILE_ALIASES[mlbAbbr] || mlbLogoRaw || mlbAbbr;
         path = "images/mlb/" + mlbLogoFile + ".png";
       }
       return this.file(path);
