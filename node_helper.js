@@ -63,6 +63,23 @@ const fetch = (typeof global.fetch === "function")
 
 const SUPPORTED_LEAGUES = ["mlb", "nhl", "nfl", "nba", "olympic_mhockey", "olympic_whockey"];
 const MLB_SCOREBOARD_SPORT_IDS = [1, 51]; // MLB + World Baseball Classic
+const MLB_INTERNATIONAL_WBC_TEAM_IDS = new Set([
+  776, // Brazil
+  784, // Canada
+  792, // Colombia
+  798, // Cuba
+  805, // Dominican Republic
+  821, // Great Britain
+  840, // Israel
+  841, // Italy
+  867, // Mexico
+  878, // Kingdom of the Netherlands
+  881, // Nicaragua
+  890, // Panama
+  897, // Puerto Rico
+  940, // United States
+  944 // Venezuela
+]);
 
 const DNS_LOOKUP = (dns && dns.promises && typeof dns.promises.lookup === "function")
   ? (host) => dns.promises.lookup(host)
@@ -148,6 +165,9 @@ module.exports = NodeHelper.create({
       }
 
       const games = Array.from(gamesByPk.values()).sort((a, b) => {
+        const tierDiff = this._getMlbGameSortTier(a) - this._getMlbGameSortTier(b);
+        if (tierDiff !== 0) return tierDiff;
+
         const aDate = Date.parse((a && a.gameDate) || "") || 0;
         const bDate = Date.parse((b && b.gameDate) || "") || 0;
         return aDate - bDate;
@@ -181,6 +201,26 @@ module.exports = NodeHelper.create({
     }
 
     return games;
+  },
+
+  _getMlbGameSortTier(game) {
+    const internationalTeams = this._countInternationalWbcTeams(game);
+    if (internationalTeams <= 0) return 0; // MLB vs MLB
+    if (internationalTeams === 1) return 1; // MLB vs WBC
+    return 2; // WBC vs WBC
+  },
+
+  _countInternationalWbcTeams(game) {
+    if (!game || !game.teams) return 0;
+
+    let count = 0;
+    const awayTeamId = Number(game.teams?.away?.team?.id);
+    const homeTeamId = Number(game.teams?.home?.team?.id);
+
+    if (MLB_INTERNATIONAL_WBC_TEAM_IDS.has(awayTeamId)) count += 1;
+    if (MLB_INTERNATIONAL_WBC_TEAM_IDS.has(homeTeamId)) count += 1;
+
+    return count;
   },
 
   async _fetchNhlGames() {
