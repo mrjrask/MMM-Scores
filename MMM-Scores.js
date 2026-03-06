@@ -63,6 +63,34 @@
     944: "Venezuela"
   };
 
+  var MLB_INTERNATIONAL_ABBREVIATIONS_BY_COUNTRY_NAME = {
+    "australia": "AUS",
+    "brazil": "BRA",
+    "canada": "CAN",
+    "chinese taipei": "TPE",
+    "colombia": "COL",
+    "cuba": "CUB",
+    "czech republic": "CZE",
+    "czechia": "CZE",
+    "dominican republic": "DOM",
+    "great britain": "GBR",
+    "israel": "ISR",
+    "italy": "ITA",
+    "japan": "JPN",
+    "kingdom of the netherlands": "NED",
+    "korea": "KOR",
+    "mexico": "MEX",
+    "netherlands": "NED",
+    "nicaragua": "NCA",
+    "panama": "PAN",
+    "puerto rico": "PUR",
+    "south korea": "KOR",
+    "taiwan": "TPE",
+    "united states": "USA",
+    "united states of america": "USA",
+    "venezuela": "VEN"
+  };
+
   var MLB_LOGO_FILE_ALIASES = {
     "AUS": "Australia",
     "BRA": "Brazil",
@@ -2492,10 +2520,20 @@
 
       if (league === "mlb") {
         var teamId = parseInt(team.id, 10);
+        var mlbCountryName = String(
+          team.shortDisplayName
+          || team.displayName
+          || team.teamName
+          || team.name
+          || team.clubName
+          || ""
+        ).trim().toLowerCase();
+        var intlCountryAbbr = MLB_INTERNATIONAL_ABBREVIATIONS_BY_COUNTRY_NAME[mlbCountryName] || "";
         var intlAbbr = Number.isFinite(teamId)
           ? MLB_INTERNATIONAL_ABBREVIATIONS_BY_TEAM_ID[teamId]
           : "";
         abbr = intlAbbr
+          || intlCountryAbbr
           || MLB_ABBREVIATIONS[name]
           || team.abbreviation
           || team.teamAbbreviation
