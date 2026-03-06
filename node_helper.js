@@ -62,6 +62,7 @@ const fetch = (typeof global.fetch === "function")
   : createHttpFetchFallback();
 
 const SUPPORTED_LEAGUES = ["mlb", "nhl", "nfl", "nba", "olympic_mhockey", "olympic_whockey"];
+const MLB_SCOREBOARD_SPORT_IDS = [1, 51]; // MLB + World Baseball Classic
 
 const DNS_LOOKUP = (dns && dns.promises && typeof dns.promises.lookup === "function")
   ? (host) => dns.promises.lookup(host)
@@ -133,13 +134,24 @@ module.exports = NodeHelper.create({
   async _fetchMlbGames() {
     try {
       const { dateIso } = this._getTargetDate();
-      const url  = `https://statsapi.mlb.com/api/v1/schedule/games?sportId=1&date=${dateIso}&hydrate=linescore`;
-      const res  = await fetch(url);
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      const gamesByPk = new Map();
+
+      for (const sportId of MLB_SCOREBOARD_SPORT_IDS) {
+        const games = await this._fetchMlbGamesBySport(dateIso, sportId);
+        for (let i = 0; i < games.length; i += 1) {
+          const game = games[i];
+          const gamePk = Number(game && game.gamePk);
+          if (Number.isFinite(gamePk)) {
+            gamesByPk.set(gamePk, game);
+          }
+        }
       }
-      const json = await res.json();
-      const games = (json.dates && json.dates[0] && json.dates[0].games) || [];
+
+      const games = Array.from(gamesByPk.values()).sort((a, b) => {
+        const aDate = Date.parse((a && a.gameDate) || "") || 0;
+        const bDate = Date.parse((b && b.gameDate) || "") || 0;
+        return aDate - bDate;
+      });
 
       console.log(`⚾️ Sending ${games.length} MLB games to front-end.`);
       this._notifyGames("mlb", games);
@@ -147,6 +159,28 @@ module.exports = NodeHelper.create({
       console.error("🚨 MLB fetchGames failed:", e);
       this._notifyGames("mlb", []);
     }
+  },
+
+  async _fetchMlbGamesBySport(dateIso, sportId) {
+    const url = `https://statsapi.mlb.com/api/v1/schedule/games?sportId=${sportId}&date=${dateIso}&hydrate=linescore`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status} ${res.statusText} (sportId=${sportId})`);
+    }
+
+    const json = await res.json();
+    const games = [];
+    const dates = Array.isArray(json && json.dates) ? json.dates : [];
+
+    for (let i = 0; i < dates.length; i += 1) {
+      const dateBucket = dates[i];
+      if (!dateBucket || !Array.isArray(dateBucket.games)) continue;
+      for (let j = 0; j < dateBucket.games.length; j += 1) {
+        games.push(dateBucket.games[j]);
+      }
+    }
+
+    return games;
   },
 
   async _fetchNhlGames() {
