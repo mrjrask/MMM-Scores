@@ -1687,7 +1687,14 @@
       else if (isPrev) {
         statusText = this._formatStartTime(game && game.gameDate);
       } else if (isFin) {
-        statusText = (innings.length === 9) ? "Final" : ("Final/" + innings.length);
+        var finalInnings = this._firstNumber(
+          ls && ls.currentInning,
+          ls && ls.scheduledInnings,
+          innings.length
+        );
+        statusText = (finalInnings == null || finalInnings === 9)
+          ? "Final"
+          : ("Final/" + finalInnings);
       } else {
         var st = (ls && ls.inningState) || "";
         var io = (ls && ls.currentInningOrdinal) || "";
