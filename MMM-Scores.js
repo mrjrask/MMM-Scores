@@ -256,7 +256,7 @@
 
   var EXTENDED_LAYOUT_LEAGUES = { nfl: true, nhl: true, nba: true, olympic_mhockey: true, olympic_whockey: true };
 
-  var SUPPORTED_LEAGUES = ["mlb", "nhl", "nfl", "nba", "olympic_mhockey", "olympic_whockey"];
+  var SUPPORTED_LEAGUES = ["mlb", "wbc", "nhl", "nfl", "nba", "olympic_mhockey", "olympic_whockey"];
   var MLB_MAX_GAMES_PER_PAGE = 8;
   var MLB_MAX_COLUMNS        = 2;
 
@@ -289,6 +289,7 @@
       if (!this.config.showTitle) return null;
       var league = this._getLeague();
       if (league === "mlb") return "MLB Scoreboard";
+      if (league === "wbc") return "WBC Scoreboard";
       if (league === "nhl") return "NHL Scoreboard";
       if (league === "nfl") return "NFL Scoreboard";
       if (league === "nba") return "NBA Scoreboard";
@@ -503,7 +504,48 @@
       var source = (typeof cfg.leagues !== "undefined") ? cfg.leagues : cfg.league;
       var leagues = this._coerceLeagueArray(source);
       if (!Array.isArray(leagues)) return [];
-      return this._filterSeasonalLeagues(leagues);
+      return this._filterSeasonalLeagues(this._expandMlbLeagueFamily(leagues));
+    },
+
+    _expandMlbLeagueFamily: function (leagues) {
+      if (!Array.isArray(leagues) || leagues.length === 0) return [];
+
+      var expanded = [];
+      for (var i = 0; i < leagues.length; i++) {
+        var league = leagues[i];
+        if (expanded.indexOf(league) === -1) expanded.push(league);
+        if (league === "mlb" && expanded.indexOf("wbc") === -1) {
+          expanded.push("wbc");
+        }
+      }
+
+      return expanded;
+    },
+
+    _rebuildLeagueRotation: function (preferredLeague) {
+      var configured = this._resolveConfiguredLeagues();
+      if (!Array.isArray(configured) || configured.length === 0) configured = ["mlb"];
+
+      var nextRotation = [];
+      for (var i = 0; i < configured.length; i++) {
+        var league = configured[i];
+        if (league === "wbc") {
+          var wbcGames = (this.gamesByLeague && Array.isArray(this.gamesByLeague.wbc))
+            ? this.gamesByLeague.wbc
+            : [];
+          if (wbcGames.length === 0) continue;
+        }
+        nextRotation.push(league);
+      }
+
+      if (nextRotation.length === 0) nextRotation = [configured[0]];
+
+      this._leagueRotation = nextRotation;
+
+      var desiredLeague = this._normalizeLeagueKey(preferredLeague) || this._getLeague();
+      var nextIndex = this._leagueRotation.indexOf(desiredLeague);
+      if (nextIndex === -1) nextIndex = 0;
+      this._activeLeagueIndex = nextIndex;
     },
 
     _todayIsoInTimeZone: function () {
@@ -651,12 +693,14 @@
     _maximumGamesPerPageForLeague: function (league) {
       if (!league) league = this._getLeague();
       if (league === "mlb") return MLB_MAX_GAMES_PER_PAGE;
+      if (league === "wbc") return MLB_MAX_GAMES_PER_PAGE;
       return null;
     },
 
     _maximumColumnsForLeague: function (league) {
       if (!league) league = this._getLeague();
       if (league === "mlb") return MLB_MAX_COLUMNS;
+      if (league === "wbc") return MLB_MAX_COLUMNS;
       return null;
     },
 
@@ -1147,12 +1191,7 @@
             delete this.extrasByLeague[league];
           }
 
-          if (!Array.isArray(this._leagueRotation) || this._leagueRotation.length === 0) {
-            this._leagueRotation = [league];
-            this._activeLeagueIndex = 0;
-          } else if (this._leagueRotation.indexOf(league) === -1) {
-            this._leagueRotation.push(league);
-          }
+          this._rebuildLeagueRotation(league);
 
           this._applyActiveLeagueState();
           this.updateDom();
