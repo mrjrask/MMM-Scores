@@ -1191,7 +1191,8 @@
             delete this.extrasByLeague[league];
           }
 
-          this._rebuildLeagueRotation(league);
+          var activeLeagueBeforeUpdate = this._getLeague();
+          this._rebuildLeagueRotation(activeLeagueBeforeUpdate);
 
           this._applyActiveLeagueState();
           this.updateDom();
