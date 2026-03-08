@@ -80,6 +80,33 @@ const MLB_INTERNATIONAL_WBC_TEAM_IDS = new Set([
   940, // United States
   944 // Venezuela
 ]);
+const MLB_INTERNATIONAL_WBC_TEAM_NAMES = new Set([
+  "australia",
+  "brazil",
+  "canada",
+  "chinese taipei",
+  "colombia",
+  "cuba",
+  "czech republic",
+  "czechia",
+  "dominican republic",
+  "great britain",
+  "israel",
+  "italy",
+  "japan",
+  "kingdom of the netherlands",
+  "korea",
+  "mexico",
+  "netherlands",
+  "nicaragua",
+  "panama",
+  "puerto rico",
+  "south korea",
+  "taiwan",
+  "united states",
+  "united states of america",
+  "venezuela"
+]);
 
 const DNS_LOOKUP = (dns && dns.promises && typeof dns.promises.lookup === "function")
   ? (host) => dns.promises.lookup(host)
@@ -237,13 +264,28 @@ module.exports = NodeHelper.create({
     if (!game || !game.teams) return 0;
 
     let count = 0;
-    const awayTeamId = Number(game.teams?.away?.team?.id);
-    const homeTeamId = Number(game.teams?.home?.team?.id);
+    const awayTeam = game.teams?.away?.team;
+    const homeTeam = game.teams?.home?.team;
 
-    if (MLB_INTERNATIONAL_WBC_TEAM_IDS.has(awayTeamId)) count += 1;
-    if (MLB_INTERNATIONAL_WBC_TEAM_IDS.has(homeTeamId)) count += 1;
+    if (this._isInternationalWbcTeam(awayTeam)) count += 1;
+    if (this._isInternationalWbcTeam(homeTeam)) count += 1;
 
     return count;
+  },
+
+  _isInternationalWbcTeam(team) {
+    const teamId = Number(team?.id);
+    if (MLB_INTERNATIONAL_WBC_TEAM_IDS.has(teamId)) return true;
+
+    const normalizedName = String(
+      team?.shortDisplayName
+      || team?.displayName
+      || team?.teamName
+      || team?.name
+      || ""
+    ).trim().toLowerCase();
+
+    return MLB_INTERNATIONAL_WBC_TEAM_NAMES.has(normalizedName);
   },
 
   async _fetchNhlGames() {
