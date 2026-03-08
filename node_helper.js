@@ -61,7 +61,7 @@ const fetch = (typeof global.fetch === "function")
   ? global.fetch.bind(global)
   : createHttpFetchFallback();
 
-const SUPPORTED_LEAGUES = ["mlb", "nhl", "nfl", "nba", "olympic_mhockey", "olympic_whockey"];
+const SUPPORTED_LEAGUES = ["mlb", "wbc", "nhl", "nfl", "nba", "olympic_mhockey", "olympic_whockey"];
 const MLB_SCOREBOARD_SPORT_IDS = [1, 51]; // MLB + World Baseball Classic
 const MLB_INTERNATIONAL_WBC_TEAM_IDS = new Set([
   776, // Brazil
@@ -173,12 +173,35 @@ module.exports = NodeHelper.create({
         return aDate - bDate;
       });
 
-      console.log(`⚾️ Sending ${games.length} MLB games to front-end.`);
-      this._notifyGames("mlb", games);
+      const separatedGames = this._splitMlbAndWbcGames(games);
+
+      console.log(`⚾️ Sending ${separatedGames.mlb.length} MLB games to front-end.`);
+      this._notifyGames("mlb", separatedGames.mlb);
+      this._notifyGames("wbc", separatedGames.wbc);
     } catch (e) {
       console.error("🚨 MLB fetchGames failed:", e);
       this._notifyGames("mlb", []);
+      this._notifyGames("wbc", []);
     }
+  },
+
+
+
+  _splitMlbAndWbcGames(games) {
+    const mlb = [];
+    const wbc = [];
+
+    for (let i = 0; i < games.length; i += 1) {
+      const game = games[i];
+      if (this._isInternationalWbcGame(game)) wbc.push(game);
+      else mlb.push(game);
+    }
+
+    return { mlb, wbc };
+  },
+
+  _isInternationalWbcGame(game) {
+    return this._countInternationalWbcTeams(game) >= 2;
   },
 
   async _fetchMlbGamesBySport(dateIso, sportId) {
@@ -2067,7 +2090,22 @@ module.exports = NodeHelper.create({
     const source = (typeof cfg.leagues !== "undefined") ? cfg.leagues : cfg.league;
     const leagues = this._coerceLeagueArray(source);
     if (!Array.isArray(leagues)) return [];
-    return this._filterSeasonalLeagues(leagues);
+    return this._filterSeasonalLeagues(this._expandMlbLeagueFamily(leagues));
+  },
+
+
+
+  _expandMlbLeagueFamily(leagues) {
+    if (!Array.isArray(leagues) || leagues.length === 0) return [];
+
+    const expanded = [];
+    for (let i = 0; i < leagues.length; i += 1) {
+      const league = leagues[i];
+      if (!expanded.includes(league)) expanded.push(league);
+      if (league === "mlb" && !expanded.includes("wbc")) expanded.push("wbc");
+    }
+
+    return expanded;
   },
 
   _todayIsoInTimeZone() {
