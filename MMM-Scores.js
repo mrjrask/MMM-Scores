@@ -1714,15 +1714,17 @@
 
       var isSuspended = /Suspended/i.test(det) || state === "Suspended";
       var isPost      = /Postponed/i.test(det);
+      var isDelayed   = /\bdelay(?:ed)?\b/i.test(det) || /\bdelay(?:ed)?\b/i.test(state);
       var isWarmup    = det === "Warmup";
       var isPrev      = state === "Preview";
       var isFin       = state === "Final";
-      var live        = !isPrev && !isFin && !isPost && !isWarmup && !isSuspended;
+      var live        = !isPrev && !isFin && !isPost && !isDelayed && !isWarmup && !isSuspended;
       var showVals    = !isPrev && !isPost && !isSuspended;
 
       var statusText;
       if (isSuspended)       statusText = "Suspended";
       else if (isPost)       statusText = "Postponed";
+      else if (isDelayed)    statusText = "Delayed";
       else if (isWarmup)     statusText = "Warmup";
       else if (isPrev) {
         statusText = this._formatStartTime(game && game.gameDate);
