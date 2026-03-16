@@ -1713,16 +1713,18 @@
       var innings = (ls && ls.innings) || [];
 
       var isSuspended = /Suspended/i.test(det) || state === "Suspended";
+      var isCanceled  = /Cancel(?:ed|led)/i.test(det) || /cancel(?:ed|led)/i.test(state);
       var isPost      = /Postponed/i.test(det);
       var isDelayed   = /\bdelay(?:ed)?\b/i.test(det) || /\bdelay(?:ed)?\b/i.test(state);
       var isWarmup    = det === "Warmup";
       var isPrev      = state === "Preview";
       var isFin       = state === "Final";
-      var live        = !isPrev && !isFin && !isPost && !isDelayed && !isWarmup && !isSuspended;
-      var showVals    = !isPrev && !isPost && !isSuspended;
+      var live        = !isPrev && !isFin && !isPost && !isDelayed && !isWarmup && !isSuspended && !isCanceled;
+      var showVals    = !isPrev && !isPost && !isSuspended && !isCanceled;
 
       var statusText;
       if (isSuspended)       statusText = "Suspended";
+      else if (isCanceled)   statusText = "Canceled";
       else if (isPost)       statusText = "Postponed";
       else if (isDelayed)    statusText = "Delayed";
       else if (isWarmup)     statusText = "Warmup";
@@ -1748,6 +1750,7 @@
       if (isFin) cardClasses.push("is-final");
       else if (live) cardClasses.push("is-live");
       else if (isPrev) cardClasses.push("is-preview");
+      else if (isCanceled) cardClasses.push("is-canceled");
       else if (isPost) cardClasses.push("is-postponed");
       else if (isSuspended) cardClasses.push("is-suspended");
       else if (isWarmup) cardClasses.push("is-warmup");
