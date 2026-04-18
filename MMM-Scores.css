@@ -560,6 +560,12 @@
   padding-bottom: calc(var(--scoreboard-pad-block) * 0.7);
 }
 
+.scoreboard-card.league-mlb .scoreboard-header .scoreboard-label,
+.scoreboard-card.league-wbc .scoreboard-header .scoreboard-label {
+  align-self: end;
+  transform: translateY(calc(var(--scoreboard-gap) * 0.42));
+}
+
 .scoreboard-card.league-mlb .scoreboard-row:first-child {
   padding-top: calc(var(--scoreboard-pad-block) * 0.7);
 }
