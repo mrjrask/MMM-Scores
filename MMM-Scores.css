@@ -246,15 +246,15 @@
   --scoreboard-mlb-rhe-gap-reduction: 0.2;
 }
 
-.scoreboard-card.league-mlb .scoreboard-header .scoreboard-label:nth-of-type(2),
-.scoreboard-card.league-wbc .scoreboard-header .scoreboard-label:nth-of-type(2),
+.scoreboard-card.league-mlb .scoreboard-header .scoreboard-label:nth-last-child(2),
+.scoreboard-card.league-wbc .scoreboard-header .scoreboard-label:nth-last-child(2),
 .scoreboard-card.league-mlb .scoreboard-row .scoreboard-value:nth-of-type(2),
 .scoreboard-card.league-wbc .scoreboard-row .scoreboard-value:nth-of-type(2) {
   margin-left: calc(var(--scoreboard-gap) * var(--scoreboard-mlb-rhe-gap-reduction) * -1);
 }
 
-.scoreboard-card.league-mlb .scoreboard-header .scoreboard-label:nth-of-type(3),
-.scoreboard-card.league-wbc .scoreboard-header .scoreboard-label:nth-of-type(3),
+.scoreboard-card.league-mlb .scoreboard-header .scoreboard-label:last-child,
+.scoreboard-card.league-wbc .scoreboard-header .scoreboard-label:last-child,
 .scoreboard-card.league-mlb .scoreboard-row .scoreboard-value:nth-of-type(3),
 .scoreboard-card.league-wbc .scoreboard-row .scoreboard-value:nth-of-type(3) {
   margin-left: calc(var(--scoreboard-gap) * var(--scoreboard-mlb-rhe-gap-reduction) * -2);
@@ -492,6 +492,68 @@
 .scoreboard-card.league-mlb .scoreboard-header,
 .scoreboard-card.league-mlb .scoreboard-row {
   column-gap: calc(var(--scoreboard-gap) * 0.18);
+}
+
+.scoreboard-card .scoreboard-mlb-inning-indicator {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: calc(var(--scoreboard-gap) * 0.28);
+  margin-left: calc(var(--scoreboard-gap) * 0.45);
+}
+
+.scoreboard-card .scoreboard-mlb-bases {
+  position: relative;
+  width: calc(var(--scoreboard-status-font) * 1.2);
+  height: calc(var(--scoreboard-status-font) * 0.96);
+}
+
+.scoreboard-card .scoreboard-mlb-base {
+  position: absolute;
+  width: calc(var(--scoreboard-status-font) * 0.38);
+  height: calc(var(--scoreboard-status-font) * 0.38);
+  border: calc(var(--box-scale) * 1px) solid var(--scoreboard-text);
+  transform: rotate(45deg);
+  background: transparent;
+  transform-origin: center;
+}
+
+.scoreboard-card .scoreboard-mlb-base.base-second {
+  top: 0;
+  left: 50%;
+  margin-left: calc(var(--scoreboard-status-font) * -0.19);
+}
+
+.scoreboard-card .scoreboard-mlb-base.base-third {
+  bottom: calc(var(--scoreboard-status-font) * 0.05);
+  left: calc(var(--scoreboard-status-font) * 0.07);
+}
+
+.scoreboard-card .scoreboard-mlb-base.base-first {
+  bottom: calc(var(--scoreboard-status-font) * 0.05);
+  right: calc(var(--scoreboard-status-font) * 0.07);
+}
+
+.scoreboard-card .scoreboard-mlb-base.occupied {
+  background: #ffd242;
+}
+
+.scoreboard-card .scoreboard-mlb-outs {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--scoreboard-gap) * 0.2);
+  margin-top: calc(var(--scoreboard-gap) * 0.3);
+}
+
+.scoreboard-card .scoreboard-mlb-out-dot {
+  width: calc(var(--scoreboard-status-font) * 0.34);
+  height: calc(var(--scoreboard-status-font) * 0.34);
+  border-radius: 50%;
+  background: rgba(255, 59, 28, 0.22);
+}
+
+.scoreboard-card .scoreboard-mlb-out-dot.active {
+  background: #ff3b1c;
 }
 
 .scoreboard-card.league-mlb .scoreboard-header {

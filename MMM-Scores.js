@@ -1516,6 +1516,9 @@
       var statusEl = document.createElement("div");
       statusEl.className = "scoreboard-status" + (live ? " live" : "");
       statusEl.textContent = (config && config.statusText) ? config.statusText : "";
+      if (config && config.statusIndicator) {
+        statusEl.appendChild(config.statusIndicator);
+      }
       if (config && config.teamTotalLabel) {
         var totalLabelEl = document.createElement("span");
         totalLabelEl.className = "scoreboard-team-total-label";
@@ -1705,6 +1708,53 @@
       return label;
     },
 
+    _createMlbInningIndicator: function (linescore) {
+      var ls = linescore || {};
+      var offense = (ls && ls.offense) || {};
+
+      var hasRunnerOnFirst = !!offense.first;
+      var hasRunnerOnSecond = !!offense.second;
+      var hasRunnerOnThird = !!offense.third;
+
+      var outsRaw = this._firstNumber(ls && ls.outs, 0);
+      var outs = Math.max(0, Math.min(2, outsRaw == null ? 0 : outsRaw));
+
+      var indicator = document.createElement("div");
+      indicator.className = "scoreboard-mlb-inning-indicator";
+
+      var bases = document.createElement("div");
+      bases.className = "scoreboard-mlb-bases";
+
+      var firstBase = document.createElement("span");
+      firstBase.className = "scoreboard-mlb-base base-first";
+      if (hasRunnerOnFirst) firstBase.classList.add("occupied");
+
+      var secondBase = document.createElement("span");
+      secondBase.className = "scoreboard-mlb-base base-second";
+      if (hasRunnerOnSecond) secondBase.classList.add("occupied");
+
+      var thirdBase = document.createElement("span");
+      thirdBase.className = "scoreboard-mlb-base base-third";
+      if (hasRunnerOnThird) thirdBase.classList.add("occupied");
+
+      bases.appendChild(secondBase);
+      bases.appendChild(thirdBase);
+      bases.appendChild(firstBase);
+      indicator.appendChild(bases);
+
+      var outsWrap = document.createElement("div");
+      outsWrap.className = "scoreboard-mlb-outs";
+      for (var oi = 0; oi < 2; oi++) {
+        var dot = document.createElement("span");
+        dot.className = "scoreboard-mlb-out-dot";
+        if (oi < outs) dot.classList.add("active");
+        outsWrap.appendChild(dot);
+      }
+      indicator.appendChild(outsWrap);
+
+      return indicator;
+    },
+
     _createMlbGameCard: function (game) {
       var league = "mlb";
       var ls      = (game && game.linescore) || {};
@@ -1805,6 +1855,7 @@
         live: live,
         showValues: showVals,
         statusText: statusText,
+        statusIndicator: live ? this._createMlbInningIndicator(ls) : null,
         metricLabels: ["R", "H", "E"],
         rows: rows,
         cardClasses: cardClasses
