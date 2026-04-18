@@ -563,7 +563,7 @@
 .scoreboard-card.league-mlb .scoreboard-header .scoreboard-label,
 .scoreboard-card.league-wbc .scoreboard-header .scoreboard-label {
   align-self: end;
-  transform: translateY(calc(var(--scoreboard-gap) * 0.42));
+  transform: translateY(calc(var(--scoreboard-gap) * 0.72));
 }
 
 .scoreboard-card.league-mlb .scoreboard-row:first-child {
