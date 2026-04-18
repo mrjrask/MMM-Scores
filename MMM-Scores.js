@@ -1526,9 +1526,6 @@
         statusEl.appendChild(totalLabelEl);
       }
       header.appendChild(statusEl);
-      if (config && config.statusIndicator) {
-        header.appendChild(config.statusIndicator);
-      }
 
       for (var li = 0; li < metricLabels.length; li++) {
         var label = document.createElement("div");
