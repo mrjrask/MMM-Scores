@@ -1516,6 +1516,9 @@
       var statusEl = document.createElement("div");
       statusEl.className = "scoreboard-status" + (live ? " live" : "");
       statusEl.textContent = (config && config.statusText) ? config.statusText : "";
+      if (config && config.statusIndicator) {
+        statusEl.appendChild(config.statusIndicator);
+      }
       if (config && config.teamTotalLabel) {
         var totalLabelEl = document.createElement("span");
         totalLabelEl.className = "scoreboard-team-total-label";

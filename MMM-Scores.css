@@ -495,44 +495,43 @@
 }
 
 .scoreboard-card .scoreboard-mlb-inning-indicator {
-  justify-self: start;
   display: flex;
   align-items: center;
-  gap: calc(var(--scoreboard-gap) * 0.32);
-  margin-left: calc(var(--scoreboard-gap) * 0.15);
-  margin-right: calc(var(--scoreboard-gap) * 0.4);
+  flex: 0 0 auto;
+  gap: calc(var(--scoreboard-gap) * 0.28);
+  margin-left: calc(var(--scoreboard-gap) * 0.45);
 }
 
 .scoreboard-card .scoreboard-mlb-bases {
-  display: grid;
-  grid-template-columns: repeat(2, calc(var(--scoreboard-status-font) * 0.46));
-  grid-template-rows: repeat(2, calc(var(--scoreboard-status-font) * 0.46));
-  gap: calc(var(--scoreboard-gap) * 0.08);
+  position: relative;
+  width: calc(var(--scoreboard-status-font) * 1.2);
+  height: calc(var(--scoreboard-status-font) * 0.96);
 }
 
 .scoreboard-card .scoreboard-mlb-base {
+  position: absolute;
   width: calc(var(--scoreboard-status-font) * 0.38);
   height: calc(var(--scoreboard-status-font) * 0.38);
   border: calc(var(--box-scale) * 1px) solid var(--scoreboard-text);
   transform: rotate(45deg);
   background: transparent;
-  justify-self: center;
-  align-self: center;
+  transform-origin: center;
 }
 
 .scoreboard-card .scoreboard-mlb-base.base-second {
-  grid-column: 1 / span 2;
-  grid-row: 1;
+  top: 0;
+  left: 50%;
+  margin-left: calc(var(--scoreboard-status-font) * -0.19);
 }
 
 .scoreboard-card .scoreboard-mlb-base.base-third {
-  grid-column: 1;
-  grid-row: 2;
+  bottom: calc(var(--scoreboard-status-font) * 0.05);
+  left: calc(var(--scoreboard-status-font) * 0.07);
 }
 
 .scoreboard-card .scoreboard-mlb-base.base-first {
-  grid-column: 2;
-  grid-row: 2;
+  bottom: calc(var(--scoreboard-status-font) * 0.05);
+  right: calc(var(--scoreboard-status-font) * 0.07);
 }
 
 .scoreboard-card .scoreboard-mlb-base.occupied {
@@ -542,8 +541,8 @@
 .scoreboard-card .scoreboard-mlb-outs {
   display: flex;
   align-items: center;
-  gap: calc(var(--scoreboard-gap) * 0.18);
-  padding-top: calc(var(--scoreboard-gap) * 0.22);
+  gap: calc(var(--scoreboard-gap) * 0.2);
+  margin-top: calc(var(--scoreboard-gap) * 0.3);
 }
 
 .scoreboard-card .scoreboard-mlb-out-dot {
