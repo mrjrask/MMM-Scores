@@ -491,7 +491,7 @@
 
 .scoreboard-card.league-mlb .scoreboard-header,
 .scoreboard-card.league-mlb .scoreboard-row {
-  column-gap: calc(var(--scoreboard-gap) * 0.18);
+  column-gap: calc(var(--scoreboard-gap) * 0.162);
 }
 
 .scoreboard-card .scoreboard-mlb-inning-indicator {
