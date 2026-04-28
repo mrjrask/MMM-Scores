@@ -1793,6 +1793,9 @@
         var st = (ls && ls.inningState) || "";
         var io = (ls && ls.currentInningOrdinal) || "";
         var tmp = (st + " " + io).replace(/\s+/g, " ").trim();
+        tmp = tmp
+          .replace(/\bBottom\b/g, "Bot")
+          .replace(/\bMiddle\b/g, "Mid");
         statusText = tmp || "In Progress";
       }
 
