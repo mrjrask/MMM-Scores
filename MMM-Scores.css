@@ -503,35 +503,36 @@
 }
 
 .scoreboard-card .scoreboard-mlb-bases {
+  --scoreboard-mlb-base-size: calc(var(--scoreboard-status-font) * 0.38);
+  --scoreboard-mlb-base-step: calc(var(--scoreboard-status-font) * 0.41);
   position: relative;
-  width: calc(var(--scoreboard-status-font) * 1.2);
-  height: calc(var(--scoreboard-status-font) * 0.96);
+  width: calc(var(--scoreboard-mlb-base-size) + (var(--scoreboard-mlb-base-step) * 2));
+  height: calc(var(--scoreboard-mlb-base-size) + (var(--scoreboard-mlb-base-step) * 2));
 }
 
 .scoreboard-card .scoreboard-mlb-base {
   position: absolute;
-  width: calc(var(--scoreboard-status-font) * 0.38);
-  height: calc(var(--scoreboard-status-font) * 0.38);
+  width: var(--scoreboard-mlb-base-size);
+  height: var(--scoreboard-mlb-base-size);
   border: calc(var(--box-scale) * 1px) solid var(--scoreboard-text);
-  transform: rotate(45deg);
   background: transparent;
+  transform: translate(-50%, -50%) rotate(45deg);
   transform-origin: center;
 }
 
 .scoreboard-card .scoreboard-mlb-base.base-second {
-  top: 0;
+  top: 50%;
   left: 50%;
-  margin-left: calc(var(--scoreboard-status-font) * -0.19);
 }
 
 .scoreboard-card .scoreboard-mlb-base.base-third {
-  bottom: calc(var(--scoreboard-status-font) * 0.05);
-  left: calc(var(--scoreboard-status-font) * 0.07);
+  top: calc(50% + var(--scoreboard-mlb-base-step));
+  left: calc(50% - var(--scoreboard-mlb-base-step));
 }
 
 .scoreboard-card .scoreboard-mlb-base.base-first {
-  bottom: calc(var(--scoreboard-status-font) * 0.05);
-  right: calc(var(--scoreboard-status-font) * 0.07);
+  top: calc(50% + var(--scoreboard-mlb-base-step));
+  left: calc(50% + var(--scoreboard-mlb-base-step));
 }
 
 .scoreboard-card .scoreboard-mlb-base.occupied {
