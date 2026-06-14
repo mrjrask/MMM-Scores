@@ -107,6 +107,10 @@ async function main() {
       url: "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard"
     },
     {
+      name: "World Cup ESPN scoreboard",
+      url: `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${dateCompact}`
+    },
+    {
       name: "Olympic men's hockey ESPN scoreboard",
       url: `https://site.api.espn.com/apis/site/v2/sports/hockey/mens-olympics/scoreboard?dates=${dateCompact}`
     },
