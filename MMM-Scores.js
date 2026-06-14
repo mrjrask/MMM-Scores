@@ -254,9 +254,9 @@
     gamesPerColumn: ["scoreboardRows", "rowsPerColumn"]
   };
 
-  var EXTENDED_LAYOUT_LEAGUES = { nfl: true, nhl: true, nba: true, olympic_mhockey: true, olympic_whockey: true };
+  var EXTENDED_LAYOUT_LEAGUES = { nfl: true, nhl: true, nba: true, worldcup: true, olympic_mhockey: true, olympic_whockey: true };
 
-  var SUPPORTED_LEAGUES = ["mlb", "wbc", "nhl", "nfl", "nba", "olympic_mhockey", "olympic_whockey"];
+  var SUPPORTED_LEAGUES = ["mlb", "wbc", "nhl", "nfl", "nba", "worldcup", "olympic_mhockey", "olympic_whockey"];
   var MLB_MAX_GAMES_PER_PAGE = 8;
   var MLB_MAX_COLUMNS        = 2;
 
@@ -274,6 +274,7 @@
       highlightedTeams_nhl:             [],
       highlightedTeams_nfl:             [],
       highlightedTeams_nba:             [],
+      highlightedTeams_worldcup:        [],
       highlightedTeams_olympic_mhockey: [],
       highlightedTeams_olympic_whockey: [],
       highlightedTeams_oly_mhockey:     [],
@@ -293,6 +294,7 @@
       if (league === "nhl") return "NHL Scoreboard";
       if (league === "nfl") return "NFL Scoreboard";
       if (league === "nba") return "NBA Scoreboard";
+      if (league === "worldcup") return "World Cup Scoreboard";
       if (league === "olympic_mhockey") return "Men's Olympic Hockey Scoreboard";
       if (league === "olympic_whockey") return "Women's Olympic Hockey Scoreboard";
       return "Scoreboard";
@@ -614,6 +616,7 @@
       if (league === "nhl") return this.config.highlightedTeams_nhl;
       if (league === "nfl") return this.config.highlightedTeams_nfl;
       if (league === "nba") return this.config.highlightedTeams_nba;
+      if (league === "worldcup") return this.config.highlightedTeams_worldcup;
       if (league === "olympic_mhockey") {
         return this._pickFirstHighlightConfig([
           this.config.highlightedTeams_olympic_mhockey,
@@ -1484,7 +1487,7 @@
       if (league === "nhl") return this._createNhlGameCard(game);
       if (league === "nfl") return this._createNflGameCard(game);
       if (league === "nba") return this._createNbaGameCard(game);
-      if (league === "olympic_mhockey" || league === "olympic_whockey") return this._createNhlGameCard(game, league);
+      if (league === "olympic_mhockey" || league === "olympic_whockey" || league === "worldcup") return this._createNhlGameCard(game, league);
       return this._createMlbGameCard(game);
     },
 
@@ -2652,7 +2655,7 @@
           || "";
       } else if (league === "nhl") {
         abbr = team.teamAbbreviation || team.abbreviation || team.triCode || team.shortName || name;
-      } else if (league === "olympic_mhockey" || league === "olympic_whockey") {
+      } else if (league === "olympic_mhockey" || league === "olympic_whockey" || league === "worldcup") {
         var olympicName = String(
           team.shortDisplayName ||
           team.displayName ||
@@ -2772,6 +2775,8 @@
       if (league === "nhl") {
         path = "images/nhl/" + String(abbr || "").toUpperCase() + ".png";
       } else if (league === "olympic_mhockey") {
+        path = "images/oly/" + String(abbr || "").toUpperCase() + ".png";
+      } else if (league === "worldcup") {
         path = "images/oly/" + String(abbr || "").toUpperCase() + ".png";
       } else if (league === "olympic_whockey") {
         path = "images/oly/" + String(abbr || "").toUpperCase() + ".png";

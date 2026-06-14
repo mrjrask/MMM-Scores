@@ -61,7 +61,7 @@ const fetch = (typeof global.fetch === "function")
   ? global.fetch.bind(global)
   : createHttpFetchFallback();
 
-const SUPPORTED_LEAGUES = ["mlb", "wbc", "nhl", "nfl", "nba", "olympic_mhockey", "olympic_whockey"];
+const SUPPORTED_LEAGUES = ["mlb", "wbc", "nhl", "nfl", "nba", "worldcup", "olympic_mhockey", "olympic_whockey"];
 const MLB_SCOREBOARD_SPORT_IDS = [1, 51]; // MLB + World Baseball Classic
 const MLB_INTERNATIONAL_WBC_TEAM_IDS = new Set([
   776, // Brazil
@@ -165,6 +165,8 @@ module.exports = NodeHelper.create({
           await this._fetchNflGames();
         } else if (league === "nba") {
           await this._fetchNbaGames();
+        } else if (league === "worldcup") {
+          await this._fetchWorldCupGames();
         } else {
           await this._fetchMlbGames();
         }
@@ -1756,6 +1758,46 @@ module.exports = NodeHelper.create({
     }
 
     return collected;
+  },
+
+  async _fetchWorldCupGames() {
+    try {
+      const { dateIso, dateCompact } = this._getTargetDate();
+      const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${dateCompact}`;
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      }
+
+      const json = await res.json();
+      const events = this._collectEspnScoreboardEvents(json);
+
+      events.sort((a, b) => {
+        const dateA = this._firstDate(
+          a && a.date,
+          a && a.startDate,
+          a && a.startTimeUTC,
+          a && a.competitions && a.competitions[0] && (a.competitions[0].date || a.competitions[0].startDate || a.competitions[0].startTimeUTC)
+        );
+        const dateB = this._firstDate(
+          b && b.date,
+          b && b.startDate,
+          b && b.startTimeUTC,
+          b && b.competitions && b.competitions[0] && (b.competitions[0].date || b.competitions[0].startDate || b.competitions[0].startTimeUTC)
+        );
+
+        if (dateA && dateB) return dateA - dateB;
+        if (dateA) return -1;
+        if (dateB) return 1;
+        return 0;
+      });
+
+      console.log(`⚽ Sending ${events.length} World Cup games for ${dateIso} to front-end.`);
+      this._notifyGames("worldcup", events);
+    } catch (e) {
+      console.error("🚨 World Cup fetchGames failed:", e);
+      this._notifyGames("worldcup", []);
+    }
   },
 
   async _fetchNflGames() {
