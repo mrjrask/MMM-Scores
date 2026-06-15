@@ -21,7 +21,7 @@ A MagicMirror² module that cycles through MLB, NHL, NFL, NBA, World Cup soccer,
 ---
 
 ## Features
-- **Eight-league scoreboards**: MLB (R/H/E linescore), WBC, NHL (goals & shots), NFL (quarter-by-quarter totals plus bye list), NBA (quarter/OT breakdown), World Cup soccer, Men's Olympic Hockey, and Women's Olympic Hockey.
+- **Eight-league scoreboards**: MLB (R/H/E linescore), WBC, NHL (goals & shots), NFL (quarter-by-quarter totals plus bye list), NBA (quarter/OT breakdown), World Cup soccer (half/extra-time clocks, stoppage time, and shootout indicators), Men's Olympic Hockey, and Women's Olympic Hockey.
 - **Automatic league rotation**: Show a single league, a custom sequence, or all supported leagues with timed page flips.
 - **Flexible layout**: Control columns, rows, or total games per page per league and scale everything with a single `layoutScale` value.
 - **Favorite team highlighting**: Per-league highlight lists add a subtle accent to matching teams on scoreboards.
@@ -160,7 +160,7 @@ Scoreboard data comes from league-specific feeds with fallbacks where needed.
 - **MLB scores**: `https://statsapi.mlb.com/api/v1/schedule/games?sportId=1&hydrate=linescore` (date based on `timeZone`).
 - **NHL scores**: Prefers `statsapi.web.nhl.com` endpoints with automatic fallbacks to the public scoreboard and REST feeds; the date adjusts for early-morning previous-day fetches.
 - **NBA scores**: `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard` for the selected date.
-- **World Cup soccer scores**: `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard` for the selected date.
+- **World Cup soccer scores**: `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard` for the selected date; live cards show `1H`, `2H`, `ET`, match minutes, stoppage time such as `45'+2'`, and shootout superscripts when provided by the feed.
 - **NFL scores**: Weekly schedules from `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=<YYYYMMDD>` aggregated across the current week; includes bye-week teams.
 - **Men's Olympic hockey scores**: Primary `https://site.api.espn.com/apis/site/v2/sports/hockey/mens-olympics/scoreboard?dates=<YYYYMMDD>` with resilient provider-chain hooks (`olympics.com`, IIHF, TheSportsDB, Wikipedia/Wikidata finals) and last-good-data fallback.
 - **Women's Olympic hockey scores**: Primary `https://site.api.espn.com/apis/site/v2/sports/hockey/womens-olympics/scoreboard?dates=<YYYYMMDD>` with the same provider-chain/fallback architecture.
