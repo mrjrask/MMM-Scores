@@ -1127,6 +1127,99 @@
       return "";
     },
 
+
+    _formatSoccerClockString: function (clock) {
+      if (clock == null) return "";
+
+      if (typeof clock === "number") {
+        if (!Number.isFinite(clock)) return "";
+        var minutes = Math.floor(Math.max(0, clock) / 60);
+        return minutes ? (minutes + "'") : "";
+      }
+
+      var trimmed = String(clock).trim();
+      if (!trimmed) return "";
+
+      var lower = trimmed.toLowerCase();
+      if (lower === "halftime" || lower === "half time" || lower === "ht") return "HT";
+      if (lower === "fulltime" || lower === "full time" || lower === "ft") return "FT";
+
+      var injuryMatch = trimmed.match(/^(\d+)\s*(?:'|′|min)?\s*\+\s*(\d+)\s*(?:'|′|min)?$/i);
+      if (injuryMatch) return injuryMatch[1] + "'+" + injuryMatch[2] + "'";
+
+      var minuteMatch = trimmed.match(/^(\d+)\s*(?:'|′|min)?$/i);
+      if (minuteMatch) return minuteMatch[1] + "'";
+
+      var clockMatch = trimmed.match(/^(\d{1,3}):(\d{2})$/);
+      if (clockMatch) {
+        var minute = parseInt(clockMatch[1], 10);
+        if (Number.isFinite(minute)) return minute + "'";
+      }
+
+      return trimmed.replace(/′/g, "'");
+    },
+
+    _soccerPeriodLabel: function (period, statusText) {
+      var numericPeriod = this._toNumberOrNull(period);
+      var normalized = String(statusText || "").toLowerCase();
+
+      if (/penalties|penalty|shootout|so\b/.test(normalized)) return "SO";
+      if (/extra|overtime|\bet\b/.test(normalized)) return "ET";
+
+      if (numericPeriod === 1) return "1H";
+      if (numericPeriod === 2) return "2H";
+      if (numericPeriod === 3 || numericPeriod === 4) return "ET";
+      if (numericPeriod === 5) return "SO";
+
+      if (/1st|first/.test(normalized)) return "1H";
+      if (/2nd|second/.test(normalized)) return "2H";
+
+      return "";
+    },
+
+    _formatSoccerLiveStatus: function (game, competition, ls, detailed) {
+      var compStatus = (competition && competition.status) || {};
+      var statusType = compStatus.type || (game && game.status && game.status.type) || {};
+      var detail = [
+        detailed,
+        compStatus.displayClock,
+        compStatus.shortDetail,
+        compStatus.detail,
+        statusType.shortDetail,
+        statusType.detail,
+        statusType.description
+      ].join(" ");
+
+      var label = this._soccerPeriodLabel(
+        compStatus.period || statusType.period || (game && game.status && game.status.period) || (ls && ls.currentPeriod),
+        detail
+      );
+
+      var clock = this._formatSoccerClockString(
+        compStatus.displayClock ||
+        compStatus.clock ||
+        statusType.displayClock ||
+        statusType.clock ||
+        (ls && (ls.currentPeriodTimeRemaining || ls.clock))
+      );
+
+      if (clock === "HT" || clock === "FT") return clock;
+      return [label, clock].filter(Boolean).join(" ") || detailed || "Live";
+    },
+
+    _extractSoccerShootoutScore: function (competitor) {
+      if (!competitor) return null;
+      return this._firstNumber(
+        competitor.shootoutScore,
+        competitor.penaltyShootoutScore,
+        competitor.penalties,
+        competitor.penaltyScore,
+        competitor.curatedRank && competitor.curatedRank.shootoutScore,
+        competitor.team && competitor.team.shootoutScore,
+        competitor.team && competitor.team.penaltyShootoutScore
+      );
+    },
+
     _metricsContainValues: function (metrics) {
       if (!Array.isArray(metrics)) return false;
       for (var i = 0; i < metrics.length; i++) {
@@ -1871,15 +1964,26 @@
     _createNhlGameCard: function (game, forcedLeague) {
       var league = forcedLeague || this._getLeague() || "nhl";
       var ls = (game && game.linescore) || {};
+      var competition = game && game.competitions && game.competitions[0];
+      if (!competition) competition = {};
+      var competitionStatus = competition.status || {};
       var status = (game && game.status) || {};
       var statusType = (status && status.type) || {};
-      var state = ((status.abstractGameState || statusType.state || status.detailedState || "") + "").toLowerCase();
-      var detailed = status.detailedState || "";
+      var competitionStatusType = competitionStatus.type || {};
+      var state = ((
+        status.abstractGameState ||
+        statusType.state ||
+        competitionStatusType.state ||
+        competitionStatus.state ||
+        status.detailedState ||
+        ""
+      ) + "").toLowerCase();
+      var detailed = status.detailedState || competitionStatusType.shortDetail || competitionStatusType.detail || competitionStatusType.description || "";
 
       var isPostponed = /postponed/i.test(detailed);
       var isSuspended = /suspended/i.test(detailed);
       var isPreview = state === "preview" || state === "pre" || state === "scheduled";
-      var isFinal = state === "final";
+      var isFinal = state === "final" || state === "post" || !!statusType.completed || !!competitionStatusType.completed;
       var isLive = !isFinal && !isPreview && !isPostponed && !isSuspended;
 
       var showVals = !(isPreview || isPostponed || isSuspended);
@@ -1895,16 +1999,20 @@
       } else if (isFinal) {
         statusText = detailed || "Final";
       } else if (isLive) {
-        var period = ls.currentPeriodOrdinal || (ls.currentPeriod ? (ls.currentPeriod + "") : "");
-        var remaining = this._formatNhlTimeRemaining(ls.currentPeriodTimeRemaining).trim();
-        if (remaining && remaining.toUpperCase && remaining.toUpperCase() === "END") {
-          statusText = (period ? period + " " : "") + "End";
-        } else if (remaining) {
-          statusText = ((period ? period + " " : "") + remaining).trim();
+        if (league === "worldcup") {
+          statusText = this._formatSoccerLiveStatus(game, competition, ls, detailed);
         } else {
-          statusText = (period || "").trim();
+          var period = ls.currentPeriodOrdinal || (ls.currentPeriod ? (ls.currentPeriod + "") : "");
+          var remaining = this._formatNhlTimeRemaining(ls.currentPeriodTimeRemaining).trim();
+          if (remaining && remaining.toUpperCase && remaining.toUpperCase() === "END") {
+            statusText = (period ? period + " " : "") + "End";
+          } else if (remaining) {
+            statusText = ((period ? period + " " : "") + remaining).trim();
+          } else {
+            statusText = (period || "").trim();
+          }
+          if (!statusText) statusText = detailed || "Live";
         }
-        if (!statusText) statusText = detailed || "Live";
       } else {
         statusText = detailed || "";
       }
@@ -1920,8 +2028,7 @@
       var away = teams.away || null;
       var home = teams.home || null;
 
-      if ((!away || !away.team || !home || !home.team) && game && game.competitions && game.competitions[0]) {
-        var competition = game.competitions[0] || {};
+      if ((!away || !away.team || !home || !home.team) && competition) {
         var competitors = Array.isArray(competition.competitors) ? competition.competitors : [];
         var compAway = null;
         var compHome = null;
@@ -1941,6 +2048,10 @@
           if (!competitor) return {};
           return {
             score: competitor.score,
+            shootoutScore: competitor.shootoutScore,
+            penaltyShootoutScore: competitor.penaltyShootoutScore,
+            penalties: competitor.penalties,
+            penaltyScore: competitor.penaltyScore,
             team: competitor.team || {}
           };
         };
@@ -1990,12 +2101,13 @@
         }
 
         var goals = this._firstNumber(entry.score, entry.goals, entry.team && entry.team.score);
+        var shootoutScore = (league === "worldcup") ? this._extractSoccerShootoutScore(entry) : null;
         var metrics = [
           {
             value: goals,
             placeholder: "—",
-            superscript: (i === 0 ? awayShots : homeShots),
-            superscriptClass: "shots-on-goal-superscript"
+            superscript: (shootoutScore != null) ? ("SO " + shootoutScore) : (i === 0 ? awayShots : homeShots),
+            superscriptClass: (shootoutScore != null) ? "shootout-superscript" : "shots-on-goal-superscript"
           }
         ];
 
