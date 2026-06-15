@@ -102,6 +102,7 @@
 
 .games-matrix.league-nfl,
 .games-matrix.league-nhl,
+.games-matrix.league-worldcup,
 .games-matrix.league-olympic_mhockey,
 .games-matrix.league-olympic_whockey,
 .games-matrix.league-nba {
@@ -227,6 +228,7 @@
 
 .scoreboard-card.league-nfl,
 .scoreboard-card.league-nhl,
+.scoreboard-card.league-worldcup,
 .scoreboard-card.league-olympic_mhockey,
 .scoreboard-card.league-olympic_whockey,
 .scoreboard-card.league-nba {
@@ -361,6 +363,7 @@
 }
 
 .scoreboard-card.league-nhl .scoreboard-team,
+.scoreboard-card.league-worldcup .scoreboard-team,
 .scoreboard-card.league-olympic_mhockey .scoreboard-team,
 .scoreboard-card.league-olympic_whockey .scoreboard-team {
   display: grid;
@@ -421,6 +424,7 @@
 }
 
 .scoreboard-card.league-nhl .scoreboard-team-logo[src*="/WSH.png"],
+.scoreboard-card.league-worldcup .scoreboard-team-logo[src*="/WSH.png"],
 .scoreboard-card.league-olympic_mhockey .scoreboard-team-logo[src*="/WSH.png"],
 .scoreboard-card.league-olympic_whockey .scoreboard-team-logo[src*="/WSH.png"] {
   height: calc(var(--scoreboard-team-font) * 0.9);
@@ -451,6 +455,7 @@
 }
 
 .scoreboard-card.league-nhl .scoreboard-team-abbr,
+.scoreboard-card.league-worldcup .scoreboard-team-abbr,
 .scoreboard-card.league-olympic_mhockey .scoreboard-team-abbr,
 .scoreboard-card.league-olympic_whockey .scoreboard-team-abbr {
   justify-self: start;
