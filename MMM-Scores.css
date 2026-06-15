@@ -104,6 +104,7 @@
 .games-matrix.league-nhl,
 .games-matrix.league-olympic_mhockey,
 .games-matrix.league-olympic_whockey,
+.games-matrix.league-worldcup,
 .games-matrix.league-nba {
   --scoreboard-card-width-base: var(--scoreboard-card-width-base-compact);
   --games-matrix-col-width: calc(var(--scoreboard-card-width-base) * var(--box-scale));
@@ -229,6 +230,7 @@
 .scoreboard-card.league-nhl,
 .scoreboard-card.league-olympic_mhockey,
 .scoreboard-card.league-olympic_whockey,
+.scoreboard-card.league-worldcup,
 .scoreboard-card.league-nba {
   --scoreboard-card-width-base: var(--scoreboard-card-width-base-compact);
 }
@@ -282,13 +284,15 @@
 
 .scoreboard-card.league-nhl .scoreboard-header,
 .scoreboard-card.league-olympic_mhockey .scoreboard-header,
-.scoreboard-card.league-olympic_whockey .scoreboard-header {
+.scoreboard-card.league-olympic_whockey .scoreboard-header,
+.scoreboard-card.league-worldcup .scoreboard-header {
   position: relative;
 }
 
 .scoreboard-card.league-nhl .scoreboard-status,
 .scoreboard-card.league-olympic_mhockey .scoreboard-status,
-.scoreboard-card.league-olympic_whockey .scoreboard-status {
+.scoreboard-card.league-olympic_whockey .scoreboard-status,
+.scoreboard-card.league-worldcup .scoreboard-status {
   position: relative;
   z-index: 1;
   flex-wrap: nowrap;
@@ -299,13 +303,15 @@
 
 .scoreboard-card.league-nhl .scoreboard-header,
 .scoreboard-card.league-olympic_mhockey .scoreboard-header,
-.scoreboard-card.league-olympic_whockey .scoreboard-header {
+.scoreboard-card.league-olympic_whockey .scoreboard-header,
+.scoreboard-card.league-worldcup .scoreboard-header {
   grid-template-columns: 1fr;
 }
 
 .scoreboard-card.league-nhl .scoreboard-header,
 .scoreboard-card.league-olympic_mhockey .scoreboard-header,
-.scoreboard-card.league-olympic_whockey .scoreboard-header {
+.scoreboard-card.league-olympic_whockey .scoreboard-header,
+.scoreboard-card.league-worldcup .scoreboard-header {
   min-height: calc(var(--scoreboard-status-font) * 1.7);
 }
 
@@ -336,7 +342,8 @@
 
 .scoreboard-card.league-nhl .scoreboard-label,
 .scoreboard-card.league-olympic_mhockey .scoreboard-label,
-.scoreboard-card.league-olympic_whockey .scoreboard-label {
+.scoreboard-card.league-olympic_whockey .scoreboard-label,
+.scoreboard-card.league-worldcup .scoreboard-label {
   display: none;
 }
 
@@ -362,7 +369,8 @@
 
 .scoreboard-card.league-nhl .scoreboard-team,
 .scoreboard-card.league-olympic_mhockey .scoreboard-team,
-.scoreboard-card.league-olympic_whockey .scoreboard-team {
+.scoreboard-card.league-olympic_whockey .scoreboard-team,
+.scoreboard-card.league-worldcup .scoreboard-team {
   display: grid;
   grid-template-columns: calc(var(--scoreboard-team-font) * 1.2) minmax(0, 1fr);
   align-items: center;
@@ -374,6 +382,19 @@
   grid-template-columns: calc(var(--scoreboard-team-font) * 1.2) minmax(3ch, 1fr) auto;
   column-gap: calc(var(--scoreboard-nhl-logo-abbr-gap) * 1.25);
   padding-right: calc(var(--scoreboard-nhl-abbr-metric-gap) * 1.35);
+}
+
+.scoreboard-card.league-worldcup .scoreboard-team {
+  grid-template-columns: calc(var(--scoreboard-team-font) * 1.2) minmax(3ch, 1fr) auto;
+  column-gap: calc(var(--scoreboard-nhl-logo-abbr-gap) * 1.25);
+  padding-right: 0;
+}
+
+.scoreboard-card.league-worldcup .scoreboard-team-total {
+  margin-left: 0;
+  justify-self: end;
+  min-width: 2ch;
+  text-align: right;
 }
 
 .scoreboard-card .scoreboard-team-total {
@@ -422,7 +443,8 @@
 
 .scoreboard-card.league-nhl .scoreboard-team-logo[src*="/WSH.png"],
 .scoreboard-card.league-olympic_mhockey .scoreboard-team-logo[src*="/WSH.png"],
-.scoreboard-card.league-olympic_whockey .scoreboard-team-logo[src*="/WSH.png"] {
+.scoreboard-card.league-olympic_whockey .scoreboard-team-logo[src*="/WSH.png"],
+.scoreboard-card.league-worldcup .scoreboard-team-logo[src*="/WSH.png"] {
   height: calc(var(--scoreboard-team-font) * 0.9);
   width: calc(var(--scoreboard-team-font) * 0.95);
   max-height: calc(var(--scoreboard-team-font) * 1.02);
@@ -452,7 +474,8 @@
 
 .scoreboard-card.league-nhl .scoreboard-team-abbr,
 .scoreboard-card.league-olympic_mhockey .scoreboard-team-abbr,
-.scoreboard-card.league-olympic_whockey .scoreboard-team-abbr {
+.scoreboard-card.league-olympic_whockey .scoreboard-team-abbr,
+.scoreboard-card.league-worldcup .scoreboard-team-abbr {
   justify-self: start;
   width: 100%;
 }

@@ -254,9 +254,9 @@
     gamesPerColumn: ["scoreboardRows", "rowsPerColumn"]
   };
 
-  var EXTENDED_LAYOUT_LEAGUES = { nfl: true, nhl: true, nba: true, olympic_mhockey: true, olympic_whockey: true };
+  var EXTENDED_LAYOUT_LEAGUES = { nfl: true, nhl: true, nba: true, worldcup: true, olympic_mhockey: true, olympic_whockey: true };
 
-  var SUPPORTED_LEAGUES = ["mlb", "wbc", "nhl", "nfl", "nba", "olympic_mhockey", "olympic_whockey"];
+  var SUPPORTED_LEAGUES = ["mlb", "wbc", "nhl", "nfl", "nba", "worldcup", "olympic_mhockey", "olympic_whockey"];
   var MLB_MAX_GAMES_PER_PAGE = 8;
   var MLB_MAX_COLUMNS        = 2;
 
@@ -274,6 +274,7 @@
       highlightedTeams_nhl:             [],
       highlightedTeams_nfl:             [],
       highlightedTeams_nba:             [],
+      highlightedTeams_worldcup:        [],
       highlightedTeams_olympic_mhockey: [],
       highlightedTeams_olympic_whockey: [],
       highlightedTeams_oly_mhockey:     [],
@@ -293,6 +294,7 @@
       if (league === "nhl") return "NHL Scoreboard";
       if (league === "nfl") return "NFL Scoreboard";
       if (league === "nba") return "NBA Scoreboard";
+      if (league === "worldcup") return "World Cup Scoreboard";
       if (league === "olympic_mhockey") return "Men's Olympic Hockey Scoreboard";
       if (league === "olympic_whockey") return "Women's Olympic Hockey Scoreboard";
       return "Scoreboard";
@@ -614,6 +616,7 @@
       if (league === "nhl") return this.config.highlightedTeams_nhl;
       if (league === "nfl") return this.config.highlightedTeams_nfl;
       if (league === "nba") return this.config.highlightedTeams_nba;
+      if (league === "worldcup") return this.config.highlightedTeams_worldcup;
       if (league === "olympic_mhockey") {
         return this._pickFirstHighlightConfig([
           this.config.highlightedTeams_olympic_mhockey,
@@ -1485,6 +1488,7 @@
       if (league === "nfl") return this._createNflGameCard(game);
       if (league === "nba") return this._createNbaGameCard(game);
       if (league === "olympic_mhockey" || league === "olympic_whockey") return this._createNhlGameCard(game, league);
+      if (league === "worldcup") return this._createWorldCupGameCard(game);
       return this._createMlbGameCard(game);
     },
 
@@ -2015,6 +2019,99 @@
         statusText: statusText,
         metricLabels: [""],
         metricValueClasses: ["shots-on-goal-value"],
+        rows: rows,
+        cardClasses: cardClasses
+      });
+    },
+
+    _createWorldCupGameCard: function (game) {
+      var league = "worldcup";
+      var competition = game && game.competitions && game.competitions[0];
+      if (!competition) competition = {};
+
+      var status = (competition.status && competition.status.type) || (game.status && game.status.type) || {};
+      var state = String(status.state || "").toLowerCase();
+      var detailed = status.shortDetail || status.detail || status.description || "";
+
+      var isPreview = state === "pre" || state === "preview" || state === "scheduled";
+      var isFinal = state === "post" || state === "final" || !!status.completed;
+      var isLive = state === "in" || state === "live";
+      if (!isPreview && !isFinal && !isLive && detailed) {
+        isFinal = /final/i.test(detailed);
+        isPreview = /scheduled|pre-game|pregame/i.test(detailed);
+        isLive = !isFinal && !isPreview;
+      }
+
+      var showVals = !isPreview;
+
+      var statusText = "";
+      if (isPreview) {
+        statusText = this._formatStartTime(competition.date || game.date);
+      } else if (isFinal) {
+        statusText = detailed || "Final";
+      } else if (isLive) {
+        statusText = detailed || "Live";
+      } else {
+        statusText = detailed || "";
+      }
+
+      var cardClasses = [];
+      if (isFinal) cardClasses.push("is-final");
+      else if (isLive) cardClasses.push("is-live");
+      else if (isPreview) cardClasses.push("is-preview");
+
+      var competitors = Array.isArray(competition.competitors) ? competition.competitors : [];
+      var away = null;
+      var home = null;
+      for (var i = 0; i < competitors.length; i++) {
+        var comp = competitors[i];
+        if (!comp) continue;
+        var side = (comp.homeAway || comp.homeAway === 0) ? String(comp.homeAway).toLowerCase() : "";
+        if (side === "home") home = comp;
+        else if (side === "away") away = comp;
+      }
+
+      if (!away && competitors.length > 0) away = competitors[0];
+      if (!home && competitors.length > 1) home = competitors[1];
+
+      var awayScore = this._firstNumber(away && away.score, away && away.points, away && away.team && away.team.score);
+      var homeScore = this._firstNumber(home && home.score, home && home.points, home && home.team && home.team.score);
+
+      var rows = [];
+      var pair = [away, home];
+      for (var idx = 0; idx < pair.length; idx++) {
+        var entry = pair[idx] || {};
+        if (!entry.team) continue;
+        var team = entry.team || {};
+        var abbr = this._abbrForTeam(team, league);
+        var score = this._firstNumber(entry.score, entry.points, team && team.score);
+        var otherScore = idx === 0 ? homeScore : awayScore;
+
+        var isLoser = false;
+        if (isFinal && score != null && otherScore != null && score !== otherScore) {
+          isLoser = score < otherScore;
+        }
+
+        rows.push({
+          type: idx === 0 ? "away" : "home",
+          abbr: abbr,
+          logoAbbr: abbr,
+          highlight: this._isHighlighted(abbr),
+          isLoser: isLoser,
+          metrics: [],
+          total: score,
+          totalPlaceholder: isPreview ? "" : "—"
+        });
+      }
+
+      if (!showVals && this._rowsContainValues(rows)) showVals = true;
+
+      return this._createScoreboardCard({
+        league: league,
+        live: isLive,
+        showValues: showVals,
+        statusText: statusText,
+        metricLabels: [],
         rows: rows,
         cardClasses: cardClasses
       });
@@ -2652,7 +2749,7 @@
           || "";
       } else if (league === "nhl") {
         abbr = team.teamAbbreviation || team.abbreviation || team.triCode || team.shortName || name;
-      } else if (league === "olympic_mhockey" || league === "olympic_whockey") {
+      } else if (league === "olympic_mhockey" || league === "olympic_whockey" || league === "worldcup") {
         var olympicName = String(
           team.shortDisplayName ||
           team.displayName ||
@@ -2772,6 +2869,8 @@
       if (league === "nhl") {
         path = "images/nhl/" + String(abbr || "").toUpperCase() + ".png";
       } else if (league === "olympic_mhockey") {
+        path = "images/oly/" + String(abbr || "").toUpperCase() + ".png";
+      } else if (league === "worldcup") {
         path = "images/oly/" + String(abbr || "").toUpperCase() + ".png";
       } else if (league === "olympic_whockey") {
         path = "images/oly/" + String(abbr || "").toUpperCase() + ".png";

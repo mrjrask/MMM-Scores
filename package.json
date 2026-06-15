@@ -1,7 +1,7 @@
 {
   "name": "MMM-Scores",
   "version": "1.0.0",
-  "description": "MagicMirror module to display today's MLB, NHL, NFL, and NBA scoreboards",
+  "description": "MagicMirror module to display today's MLB, NHL, NFL, NBA, World Cup, and Olympic scoreboards",
   "main": "MMM-Scores.js",
   "scripts": {
     "test:api": "node scripts/test-api-connections.js",
