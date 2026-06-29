@@ -511,17 +511,7 @@
 
     _expandMlbLeagueFamily: function (leagues) {
       if (!Array.isArray(leagues) || leagues.length === 0) return [];
-
-      var expanded = [];
-      for (var i = 0; i < leagues.length; i++) {
-        var league = leagues[i];
-        if (expanded.indexOf(league) === -1) expanded.push(league);
-        if (league === "mlb" && expanded.indexOf("wbc") === -1) {
-          expanded.push("wbc");
-        }
-      }
-
-      return expanded;
+      return leagues.slice();
     },
 
     _rebuildLeagueRotation: function (preferredLeague) {
