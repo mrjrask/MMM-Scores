@@ -157,7 +157,7 @@ Example:
 ## Data Sources
 Scoreboard data comes from league-specific feeds with fallbacks where needed.
 
-- **MLB scores**: `https://statsapi.mlb.com/api/v1/schedule/games?sportId=1&hydrate=linescore` (date based on `timeZone`).
+- **MLB scores**: `https://statsapi.mlb.com/api/v1/schedule/games?sportId=1&hydrate=linescore` (date based on `timeZone`), filtered to MLB club-vs-club games only. International/WBC matchups are kept off the MLB scoreboard and only appear when `wbc` is explicitly configured.
 - **NHL scores**: Prefers `statsapi.web.nhl.com` endpoints with automatic fallbacks to the public scoreboard and REST feeds; the date adjusts for early-morning previous-day fetches.
 - **NBA scores**: `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard` for the selected date.
 - **World Cup soccer scores**: `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard` for the selected date; live cards show `1H`, `2H`, `ET`, match minutes, stoppage time such as `45'+2'`, and shootout superscripts when provided by the feed.

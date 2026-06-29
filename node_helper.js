@@ -62,7 +62,7 @@ const fetch = (typeof global.fetch === "function")
   : createHttpFetchFallback();
 
 const SUPPORTED_LEAGUES = ["mlb", "wbc", "nhl", "nfl", "nba", "worldcup", "olympic_mhockey", "olympic_whockey"];
-const MLB_SCOREBOARD_SPORT_IDS = [1, 51]; // MLB + World Baseball Classic
+const MLB_SCOREBOARD_SPORT_IDS = [1, 51]; // MLB plus explicit international/WBC feeds, split before display
 const MLB_INTERNATIONAL_WBC_TEAM_IDS = new Set([
   776, // Brazil
   784, // Canada
@@ -222,15 +222,15 @@ module.exports = NodeHelper.create({
 
     for (let i = 0; i < games.length; i += 1) {
       const game = games[i];
-      if (this._isInternationalWbcGame(game)) wbc.push(game);
+      if (this._isInternationalMlbGame(game)) wbc.push(game);
       else mlb.push(game);
     }
 
     return { mlb, wbc };
   },
 
-  _isInternationalWbcGame(game) {
-    return this._countInternationalWbcTeams(game) >= 2;
+  _isInternationalMlbGame(game) {
+    return this._countInternationalWbcTeams(game) > 0;
   },
 
   async _fetchMlbGamesBySport(dateIso, sportId) {
@@ -2181,15 +2181,7 @@ module.exports = NodeHelper.create({
 
   _expandMlbLeagueFamily(leagues) {
     if (!Array.isArray(leagues) || leagues.length === 0) return [];
-
-    const expanded = [];
-    for (let i = 0; i < leagues.length; i += 1) {
-      const league = leagues[i];
-      if (!expanded.includes(league)) expanded.push(league);
-      if (league === "mlb" && !expanded.includes("wbc")) expanded.push("wbc");
-    }
-
-    return expanded;
+    return leagues.slice();
   },
 
   _todayIsoInTimeZone() {
