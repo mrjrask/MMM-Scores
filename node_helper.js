@@ -184,8 +184,10 @@ module.exports = NodeHelper.create({
 
   async _fetchMlbGames() {
     try {
-      const { dateIso } = this._getTargetDate();
+      const context = this._getScoreboardDateContext();
+      const dateIso = context.scoreboardDateIso;
       const gamesByPk = new Map();
+      const scheduleByPk = new Map();
 
       for (const sportId of MLB_SCOREBOARD_SPORT_IDS) {
         const games = await this._fetchMlbGamesBySport(dateIso, sportId);
@@ -194,6 +196,15 @@ module.exports = NodeHelper.create({
           const gamePk = Number(game && game.gamePk);
           if (Number.isFinite(gamePk)) {
             gamesByPk.set(gamePk, game);
+          }
+        }
+
+        if (context.beforeUpdateCutoff) {
+          const scheduleGames = await this._fetchMlbGamesBySport(context.todayIso, sportId);
+          for (let i = 0; i < scheduleGames.length; i += 1) {
+            const game = scheduleGames[i];
+            const gamePk = Number(game && game.gamePk);
+            if (Number.isFinite(gamePk)) scheduleByPk.set(gamePk, game);
           }
         }
       }
@@ -207,11 +218,19 @@ module.exports = NodeHelper.create({
         return aDate - bDate;
       });
 
-      const separatedGames = this._splitMlbAndWbcGames(games);
+      const displayGames = context.beforeUpdateCutoff ? this._finalGamesOnly(games) : games;
+      const separatedGames = this._splitMlbAndWbcGames(displayGames);
+      const separatedSchedule = context.beforeUpdateCutoff
+        ? this._splitMlbAndWbcGames(Array.from(scheduleByPk.values()).sort((a, b) => {
+          const aDate = Date.parse((a && a.gameDate) || "") || 0;
+          const bDate = Date.parse((b && b.gameDate) || "") || 0;
+          return aDate - bDate;
+        }))
+        : { mlb: [], wbc: [] };
 
       console.log(`⚾️ Sending ${separatedGames.mlb.length} MLB games to front-end.`);
-      this._notifyGames("mlb", separatedGames.mlb);
-      this._notifyGames("wbc", separatedGames.wbc);
+      this._notifyGames("mlb", separatedGames.mlb, { scheduleGames: separatedSchedule.mlb, showingPreviousFinals: context.beforeUpdateCutoff });
+      this._notifyGames("wbc", separatedGames.wbc, { scheduleGames: separatedSchedule.wbc, showingPreviousFinals: context.beforeUpdateCutoff });
     } catch (e) {
       console.error("🚨 MLB fetchGames failed:", e);
       this._notifyGames("mlb", []);
@@ -296,9 +315,17 @@ module.exports = NodeHelper.create({
   },
 
   async _fetchNhlGames() {
-    const { dateIso } = this._getTargetDate();
-    const scoreboardDateIso = this._getNhlScoreboardDate();
-    const targetDate = scoreboardDateIso || dateIso;
+    const context = this._getScoreboardDateContext();
+    const dateIso = context.dateIso;
+    const targetDate = context.scoreboardDateIso;
+    let scheduleGames = [];
+    if (context.beforeUpdateCutoff) {
+      try {
+        scheduleGames = await this._fetchNhlScoreboardGames(context.todayIso);
+      } catch (scheduleError) {
+        console.warn(`⚠️ NHL current-day schedule fetch failed for ${context.todayIso}:`, scheduleError.message || scheduleError);
+      }
+    }
 
     let delivered = false;
     let sent = false;
@@ -316,7 +343,7 @@ module.exports = NodeHelper.create({
         const games = Array.isArray(statsGames) ? statsGames : [];
         const count = games.length;
 
-        this._notifyGames("nhl", games);
+        this._notifyGames("nhl", context.beforeUpdateCutoff ? this._finalGamesOnly(games) : games, { scheduleGames, showingPreviousFinals: context.beforeUpdateCutoff });
         sent = true;
 
         if (count > 0) {
@@ -339,7 +366,7 @@ module.exports = NodeHelper.create({
         const games = Array.isArray(scoreboardGames) ? scoreboardGames : [];
         const count = games.length;
 
-        this._notifyGames("nhl", games);
+        this._notifyGames("nhl", context.beforeUpdateCutoff ? this._finalGamesOnly(games) : games, { scheduleGames, showingPreviousFinals: context.beforeUpdateCutoff });
         sent = true;
 
         if (count > 0) {
@@ -359,7 +386,7 @@ module.exports = NodeHelper.create({
         const restGames = await this._fetchNhlStatsRestGames(targetDate);
         if (restGames.length > 0) {
           console.log(`🏒 Sending ${restGames.length} NHL games to front-end (stats REST fallback).`);
-          this._notifyGames("nhl", restGames);
+          this._notifyGames("nhl", context.beforeUpdateCutoff ? this._finalGamesOnly(restGames) : restGames, { scheduleGames, showingPreviousFinals: context.beforeUpdateCutoff });
           delivered = true;
           sent = true;
         } else {
@@ -1213,8 +1240,18 @@ module.exports = NodeHelper.create({
       ];
 
     try {
-      const { dateIso, dateCompact } = this._getTargetDate({ previousDayCutoffMinutes: 3 * 60 });
+      const context = this._getScoreboardDateContext({ previousDayCutoffMinutes: 3 * 60 });
+      const { dateIso, dateCompact } = context;
       let normalizedGames = [];
+      let scheduleGames = [];
+      if (context.beforeUpdateCutoff) {
+        try {
+          const scheduleCandidate = await providerPlans[0].fetcher(context.todayIso, context.todayCompact);
+          scheduleGames = this._normalizedGamesToLegacyEvents(Array.isArray(scheduleCandidate) ? scheduleCandidate : []);
+        } catch (scheduleError) {
+          console.warn(`⚠️ ${leagueKey} current-day schedule fetch failed for ${context.todayIso}:`, scheduleError.message || scheduleError);
+        }
+      }
       let providerUsed = "none";
 
       for (let i = 0; i < providerPlans.length; i += 1) {
@@ -1258,8 +1295,11 @@ module.exports = NodeHelper.create({
       }
 
       const events = this._normalizedGamesToLegacyEvents(normalizedGames);
-      console.log(`🥅 Sending ${events.length} ${leagueKey} games for ${dateIso} to front-end via ${providerUsed}.`);
-      this._notifyGames(leagueKey, events, {
+      const displayEvents = context.beforeUpdateCutoff ? this._finalGamesOnly(events) : events;
+      console.log(`🥅 Sending ${displayEvents.length} ${leagueKey} games for ${dateIso} to front-end via ${providerUsed}.`);
+      this._notifyGames(leagueKey, displayEvents, {
+        scheduleGames,
+        showingPreviousFinals: context.beforeUpdateCutoff,
         olympicDiagnostics: {
           providerUsed,
           fetchedAtUTC: new Date().toISOString(),
@@ -1699,7 +1739,8 @@ module.exports = NodeHelper.create({
 
   async _fetchNbaGames() {
     try {
-      const { dateIso, dateCompact } = this._getTargetDate();
+      const context = this._getScoreboardDateContext();
+      const { dateIso, dateCompact } = context;
       const url = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateCompact}`;
       const res = await fetch(url);
       if (!res.ok) {
@@ -1728,8 +1769,15 @@ module.exports = NodeHelper.create({
         return 0;
       });
 
-      console.log(`🏀 Sending ${events.length} NBA games for ${dateIso} to front-end.`);
-      this._notifyGames("nba", events);
+      let scheduleGames = [];
+      if (context.beforeUpdateCutoff) {
+        const scheduleUrl = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${context.todayCompact}`;
+        const scheduleRes = await fetch(scheduleUrl);
+        if (scheduleRes.ok) scheduleGames = this._collectEspnScoreboardEvents(await scheduleRes.json());
+      }
+      const displayEvents = context.beforeUpdateCutoff ? this._finalGamesOnly(events) : events;
+      console.log(`🏀 Sending ${displayEvents.length} NBA games for ${dateIso} to front-end.`);
+      this._notifyGames("nba", displayEvents, { scheduleGames, showingPreviousFinals: context.beforeUpdateCutoff });
     } catch (e) {
       console.error("🚨 NBA fetchGames failed:", e);
       this._notifyGames("nba", []);
@@ -1767,7 +1815,8 @@ module.exports = NodeHelper.create({
 
   async _fetchWorldCupGames() {
     try {
-      const { dateIso, dateCompact } = this._getTargetDate();
+      const context = this._getScoreboardDateContext();
+      const { dateIso, dateCompact } = context;
       const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${dateCompact}`;
       const res = await fetch(url);
       if (!res.ok) {
@@ -1797,8 +1846,15 @@ module.exports = NodeHelper.create({
         return 0;
       });
 
-      console.log(`⚽ Sending ${events.length} World Cup games for ${dateIso} to front-end.`);
-      this._notifyGames("worldcup", events);
+      let scheduleGames = [];
+      if (context.beforeUpdateCutoff) {
+        const scheduleUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${context.todayCompact}`;
+        const scheduleRes = await fetch(scheduleUrl);
+        if (scheduleRes.ok) scheduleGames = this._collectEspnScoreboardEvents(await scheduleRes.json());
+      }
+      const displayEvents = context.beforeUpdateCutoff ? this._finalGamesOnly(events) : events;
+      console.log(`⚽ Sending ${displayEvents.length} World Cup games for ${dateIso} to front-end.`);
+      this._notifyGames("worldcup", displayEvents, { scheduleGames, showingPreviousFinals: context.beforeUpdateCutoff });
     } catch (e) {
       console.error("🚨 World Cup fetchGames failed:", e);
       this._notifyGames("worldcup", []);
@@ -1807,6 +1863,20 @@ module.exports = NodeHelper.create({
 
   async _fetchNflGames() {
     try {
+      const context = this._getScoreboardDateContext();
+      if (context.beforeUpdateCutoff) {
+        const previousResults = await this._fetchNflWeekGames([context.previousDateIso]);
+        const todayResults = await this._fetchNflWeekGames([context.todayIso]);
+        const games = this._finalGamesOnly(previousResults.games);
+        console.log(`🏈 Sending ${games.length} NFL final games for ${context.previousDateIso} plus ${todayResults.games.length} scheduled games for ${context.todayIso}.`);
+        this._notifyGames("nfl", games, {
+          teamsOnBye: previousResults.byes,
+          scheduleGames: todayResults.games,
+          showingPreviousFinals: true
+        });
+        return;
+      }
+
       const weekRange = this._getNflWeekDateRange();
       let results = await this._fetchNflWeekGames(weekRange.dateIsos);
 
@@ -2215,6 +2285,14 @@ module.exports = NodeHelper.create({
   },
 
   _getTargetDate(options) {
+    const context = this._getScoreboardDateContext(options);
+    return {
+      dateIso: context.scoreboardDateIso,
+      dateCompact: context.scoreboardDateIso.replace(/-/g, "")
+    };
+  },
+
+  _getScoreboardDateContext(options) {
     const opts = options && typeof options === "object" ? options : {};
     const usePreviousDayEarly = opts.usePreviousDayEarly !== false;
     const cutoffMinutes = Number.isFinite(opts.previousDayCutoffMinutes)
@@ -2222,29 +2300,56 @@ module.exports = NodeHelper.create({
       : ((Number.isFinite(opts.previousDayCutoffHour) ? opts.previousDayCutoffHour * 60 : 9 * 60 + 30));
     const tz = this.config && this.config.timeZone ? this.config.timeZone : "America/Chicago";
     const now = new Date();
-    let dateIso = now.toLocaleDateString("en-CA", { timeZone: tz });
-    const timeCT  = now.toLocaleTimeString("en-GB", {
+    const todayIso = now.toLocaleDateString("en-CA", { timeZone: tz });
+    const timeStr = now.toLocaleTimeString("en-GB", {
       timeZone: tz,
       hour12: false,
       hour: "2-digit",
       minute: "2-digit"
     });
-    const [hStr, mStr] = timeCT.split(":");
+    const [hStr, mStr] = timeStr.split(":");
     const h = parseInt(hStr, 10);
     const m = parseInt(mStr, 10);
-
-    // Before the configured local cutoff, show yesterday's schedule (catch late finishes)
     const currentMinutes = (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
-    if (usePreviousDayEarly && currentMinutes < cutoffMinutes) {
-      const dt = new Date(dateIso);
-      dt.setDate(dt.getDate() - 1);
-      dateIso = dt.toISOString().slice(0, 10);
-    }
+    const beforeUpdateCutoff = usePreviousDayEarly && currentMinutes < cutoffMinutes;
+    const previousDateIso = this._addDaysIso(todayIso, -1);
+    const scoreboardDateIso = beforeUpdateCutoff ? previousDateIso : todayIso;
 
     return {
-      dateIso,
-      dateCompact: dateIso.replace(/-/g, "")
+      todayIso,
+      previousDateIso,
+      scoreboardDateIso,
+      beforeUpdateCutoff,
+      cutoffMinutes,
+      dateIso: scoreboardDateIso,
+      dateCompact: scoreboardDateIso.replace(/-/g, ""),
+      todayCompact: todayIso.replace(/-/g, "")
     };
+  },
+
+  _addDaysIso(dateIso, days) {
+    const dt = new Date(`${dateIso}T00:00:00Z`);
+    dt.setUTCDate(dt.getUTCDate() + days);
+    return dt.toISOString().slice(0, 10);
+  },
+
+  _isFinalGame(game) {
+    if (!game || typeof game !== "object") return false;
+    const status = game.status || {};
+    const statusType = status.type || {};
+    const abstractState = String(status.abstractGameState || "").toLowerCase();
+    const detailedState = String(status.detailedState || "").toLowerCase();
+    const codedState = String(status.codedGameState || status.statusCode || "").toLowerCase();
+    if (abstractState === "final" || detailedState.indexOf("final") !== -1 || codedState === "f") return true;
+    if (statusType.completed === true || status.completed === true) return true;
+    const typeName = String(statusType.name || statusType.state || statusType.type || "").toLowerCase();
+    const description = String(statusType.description || statusType.detail || statusType.shortDetail || "").toLowerCase();
+    return typeName === "post" || typeName === "final" || description.indexOf("final") !== -1;
+  },
+
+  _finalGamesOnly(games) {
+    if (!Array.isArray(games)) return [];
+    return games.filter((game) => this._isFinalGame(game));
   },
 
   _getNhlScoreboardDate() {

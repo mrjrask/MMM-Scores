@@ -317,6 +317,7 @@
       this.loadedLeagues   = {};
       this.extrasByLeague  = {};
       this.currentExtras   = null;
+      this.scheduleGamesByLeague = {};
 
       this._leagueRotation    = this._resolveConfiguredLeagues();
       if (!Array.isArray(this._leagueRotation) || this._leagueRotation.length === 0) {
@@ -594,7 +595,12 @@
         : 0;
       this._scoreboardPageCount = scoreboardPages;
 
-      var totalPages = scoreboardPages;
+      var scheduleGames = (this.scheduleGamesByLeague && Array.isArray(this.scheduleGamesByLeague[league]))
+        ? this.scheduleGamesByLeague[league]
+        : [];
+      var schedulePages = scheduleGames.length > 0 ? 1 : 0;
+
+      var totalPages = scoreboardPages + schedulePages;
       if (totalPages === 0) totalPages = 1;
 
       this.totalGamePages = totalPages;
@@ -1270,6 +1276,13 @@
           if (!this.loadedLeagues) this.loadedLeagues = {};
           this.loadedLeagues[league] = true;
 
+          if (!this.scheduleGamesByLeague) this.scheduleGamesByLeague = {};
+          if (extras && Array.isArray(extras.scheduleGames) && extras.scheduleGames.length > 0) {
+            this.scheduleGamesByLeague[league] = extras.scheduleGames;
+          } else if (Object.prototype.hasOwnProperty.call(this.scheduleGamesByLeague, league)) {
+            delete this.scheduleGamesByLeague[league];
+          }
+
           if (!this.extrasByLeague) this.extrasByLeague = {};
           if (extras && Object.keys(extras).length > 0) {
             this.extrasByLeague[league] = extras;
@@ -1321,7 +1334,11 @@
         this._setModuleContentWidth(null);
         return this._noData("Loading games...");
       }
-      if (this.games.length === 0) {
+      var activeLeagueForData = this._getLeague();
+      var activeScheduleGames = (this.scheduleGamesByLeague && Array.isArray(this.scheduleGamesByLeague[activeLeagueForData]))
+        ? this.scheduleGamesByLeague[activeLeagueForData]
+        : [];
+      if (this.games.length === 0 && activeScheduleGames.length === 0) {
         this._setModuleContentWidth(null);
         return this._noData("No games to display.");
       }
@@ -1369,9 +1386,27 @@
       var scoreboardPages = this._scoreboardPageCount || 0;
       var scoreboardRendered = false;
 
+      var scheduleGamesForLeague = (this.scheduleGamesByLeague && Array.isArray(this.scheduleGamesByLeague[activeLeague]))
+        ? this.scheduleGamesByLeague[activeLeague]
+        : [];
+      var pageGames = null;
+      var isSchedulePage = false;
+
       if (scoreboardPages > 0 && this.currentScreen < scoreboardPages) {
         var start = this.currentScreen * this._gamesPerPage;
-        var games = this.games.slice(start, start + this._gamesPerPage);
+        pageGames = this.games.slice(start, start + this._gamesPerPage);
+      } else if (scheduleGamesForLeague.length > 0 && this.currentScreen === scoreboardPages) {
+        pageGames = scheduleGamesForLeague.slice(0, this._gamesPerPage);
+        isSchedulePage = true;
+      }
+
+      if (pageGames && pageGames.length > 0) {
+        if (isSchedulePage) {
+          var scheduleTitle = document.createElement("div");
+          scheduleTitle.className = "small dimmed";
+          scheduleTitle.innerText = "Today's Schedule";
+          container.appendChild(scheduleTitle);
+        }
 
         var matrix = document.createElement("div");
         matrix.className = "games-matrix";
@@ -1382,13 +1417,13 @@
         var orderedGames = new Array(totalSlots);
         var isRightPlacement = this._shouldUseRightPlacement();
 
-        var limit = games.length < totalSlots ? games.length : totalSlots;
+        var limit = pageGames.length < totalSlots ? pageGames.length : totalSlots;
         for (var gi = 0; gi < limit; gi++) {
           var columnIndex = Math.floor(gi / this._scoreboardRows);
           if (isRightPlacement) columnIndex = (this._scoreboardColumns - 1) - columnIndex;
           var rowIndex = gi % this._scoreboardRows;
           var slotIndex = rowIndex * this._scoreboardColumns + columnIndex;
-          orderedGames[slotIndex] = games[gi];
+          orderedGames[slotIndex] = pageGames[gi];
         }
 
         for (var r = 0; r < this._scoreboardRows; r++) {
@@ -1420,7 +1455,7 @@
         }
 
         container.appendChild(matrix);
-        scoreboardRendered = true;
+        scoreboardRendered = !isSchedulePage;
       }
 
       if (scoreboardRendered && activeLeague === "nfl") {
