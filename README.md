@@ -50,6 +50,11 @@ Place any custom logos or font files as described below, then add the module to 
 ---
 
 ## API Connectivity Check
+Run the offline unit tests for shared league/date logic:
+```bash
+npm test
+```
+
 Use this script to verify that every external API endpoint used by the helper is reachable from your host:
 ```bash
 npm run test:api
@@ -59,6 +64,11 @@ The command checks MLB, NHL (all fallback feeds), NFL, NBA, World Cup soccer, an
 Use this Olympic-focused diagnostics script to check provider reachability and print normalized men's/women's Olympic games for a target date:
 ```bash
 npm run test:olympic -- 2026-02-11
+```
+
+Validate bundled font/logo assets without hitting network APIs:
+```bash
+npm run check:assets
 ```
 
 ---
@@ -96,6 +106,14 @@ Every option may be declared globally, as an object keyed by league (`{ mlb: val
 | `rotateIntervalScores` | `number` | `15000` | Milliseconds between scoreboard page rotations. |
 | `timeZone` | `string` | `"America/Chicago"` | Time zone used to decide the scoreboard date. Before the configured daily update cutoff (09:30 local for most leagues, 03:00 for Olympic hockey), scoreboards show previous-day final scores and then rotate to a current-day schedule screen; after the cutoff they show the current day's scoreboard. |
 | `providerCacheMs` | `number` | `20000` | Per-provider/per-date Olympic provider cache TTL in milliseconds (minimum 15000). |
+| `requestTimeoutMs` | `number` | `15000` | Maximum time in milliseconds for each helper HTTP request before it is aborted. |
+| `lastGoodCacheMs` | `number` | `21600000` | How long a last successful response can be reused if a provider fails; stale payloads are flagged for the UI. |
+| `seasonalFiltering` | `boolean` | `true` | Enables automatic hiding for known seasonal windows such as the 2026 NHL Olympic break and Olympic scoreboard retirement. |
+| `hideNhlDuringOlympics` | `boolean` | `true` | Hide NHL while the configured NHL break window is active. |
+| `hideNhlFrom` / `hideNhlUntil` | `string` | `"2026-02-06"` / `"2026-02-24"` | Inclusive ISO dates for the NHL Olympic-break visibility window. |
+| `hideOlympicsAfterEnd` | `boolean` | `true` | Hide Olympic hockey scoreboards after the configured Olympic end date. |
+| `hideOlympicsFrom` | `string` | `"2026-02-24"` | ISO date when Olympic hockey scoreboards are hidden unless seasonal filtering is disabled. |
+| `showProviderStatus` | `boolean` | `false` | Shows a compact source/updated/stale-data line above the scoreboards; stale fallback data is always indicated. |
 | `scoreboardColumns` | `number` | auto | Columns per page. Defaults to 2 for MLB (capped at 2) and 4 for NHL/NFL/NBA/World Cup/Olympic hockey. |
 | `gamesPerColumn` (`scoreboardRows`) | `number` | auto | Games stacked in each column (4 for all leagues unless overridden). |
 | `gamesPerPage` | `number` | derived | Override the total games per page; rows adjust automatically per league. |
@@ -110,7 +128,26 @@ Every option may be declared globally, as an object keyed by league (`{ mlb: val
 - **Object form**: For `layoutScale` or highlight lists, you can pass an object with `default` and per-league keys.
 
 ### League rotation
-The module keeps an internal rotation list derived from `league`/`leagues`. It fetches games for every configured league on each helper poll and flips the front-end page every `rotateIntervalScores` milliseconds.
+The module keeps an internal rotation list derived from `league`/`leagues`. It fetches games for every configured league on each helper poll and flips the front-end page every `rotateIntervalScores` milliseconds. Helper fetches run independently so one slow provider does not block the rest of the rotation.
+
+### Provider resilience and seasonal visibility
+All helper HTTP requests use `requestTimeoutMs` and validated HTTP status handling. When a provider fails, the helper reuses the most recent successful payload for that league until `lastGoodCacheMs` expires and marks the data as stale. Set `showProviderStatus: true` to show source/update metadata even when data is fresh; stale fallback data is shown automatically.
+
+Seasonal filtering is configurable. For example, keep NHL and Olympic boards visible regardless of the built-in 2026 windows:
+```js
+config: {
+  league: "all",
+  seasonalFiltering: false
+}
+```
+Or customize the dates:
+```js
+config: {
+  hideNhlFrom: "2026-02-06",
+  hideNhlUntil: "2026-02-24",
+  hideOlympicsFrom: "2026-02-25"
+}
+```
 
 ### Highlighting
 Highlight any number of teams per league using the appropriate `_mlb`, `_nhl`, `_nfl`, `_nba`, `_worldcup`, `_olympic_mhockey` (or `_oly_mhockey`), or `_olympic_whockey` (or `_oly_whockey`) suffix. Highlights apply to scoreboards.
@@ -142,6 +179,7 @@ MMM-Scores/
 - **Logos**: Place transparent PNG logos named with the abbreviations used in-game data (`CUBS.png`, `NYR.png`, `kc.png`, `CHI.png`, etc.). The module falls back to text when a logo is missing. Olympic men's/women's hockey and World Cup soccer read from `images/oly/<CODE>.png` (for example `CAN.png`, `USA.png`, `SWE.png`).
 - **Font**: Drop `fonts/TimesSquare-m105.ttf` into `fonts/`. The CSS registers it with `@font-face`.
 - **Styling tweaks**: Override CSS variables in `MMM-Scores.css` or globally (e.g., `css/custom.css`). Useful variables include `--scoreboard-card-width-base`, `--scoreboard-team-font-base`, `--scoreboard-value-font-base`, `--scoreboard-gap-base`, and `--matrix-gap-base`.
+- **Asset diagnostics**: Run `npm run check:assets` after adding logos or fonts. The command verifies required folders/files and warns about case-colliding PNG names that can behave differently across filesystems.
 
 Example:
 ```css

@@ -281,6 +281,15 @@
       highlightedTeams_oly_whockey:     [],
       showTitle:                        true,
       useTimesSquareFont:               true,
+      requestTimeoutMs:              15000,
+      lastGoodCacheMs:         6 * 60 * 60 * 1000,
+      seasonalFiltering:                true,
+      hideNhlDuringOlympics:            true,
+      hideNhlFrom:              "2026-02-06",
+      hideNhlUntil:             "2026-02-24",
+      hideOlympicsAfterEnd:             true,
+      hideOlympicsFrom:         "2026-02-24",
+      showProviderStatus:              false,
 
       // Width cap so it behaves in middle_center
       maxWidth:                      "800px"
@@ -303,7 +312,7 @@
     getScripts: function () {
       // MagicMirror already provides moment-timezone globally; avoid loading our own copy to
       // prevent clobbering other modules (e.g., the Calendar module relies on moment.tz).
-      return [];
+      return ["shared-league-config.js"];
     },
 
     getStyles: function () {
@@ -388,44 +397,35 @@
       return "mlb";
     },
 
+    _leagueConfig: function () {
+      return (typeof window !== "undefined" && window.MmmScoresLeagueConfig) ? window.MmmScoresLeagueConfig : null;
+    },
+
     _normalizeLeagueKey: function (value) {
+      var shared = this._leagueConfig();
+      if (shared) return shared.normalizeLeagueKey(value);
       if (value == null) return null;
       var str = String(value).trim().toLowerCase();
-      return (SUPPORTED_LEAGUES.indexOf(str) !== -1) ? str : null;
+      return SUPPORTED_LEAGUES.indexOf(str) !== -1 ? str : null;
     },
 
     _coerceLeagueArray: function (input) {
+      var shared = this._leagueConfig();
+      if (shared) return shared.coerceLeagueArray(input);
       var tokens = [];
       var collect = function (entry) {
         if (entry == null) return;
-        if (Array.isArray(entry)) {
-          for (var i = 0; i < entry.length; i++) collect(entry[i]);
-          return;
-        }
-        var str = String(entry).trim();
-        if (!str) return;
-        var parts = str.split(/[\s,]+/);
-        for (var j = 0; j < parts.length; j++) {
-          var part = parts[j].trim();
-          if (part) tokens.push(part);
-        }
+        if (Array.isArray(entry)) { for (var i = 0; i < entry.length; i++) collect(entry[i]); return; }
+        String(entry).trim().split(/[\s,]+/).forEach(function (part) { if (part) tokens.push(part); });
       };
       collect(input);
-
-      var normalized = [];
-      var seen = {};
+      var out = [], seen = {};
       for (var k = 0; k < tokens.length; k++) {
-        var token = tokens[k];
-        var lower = token.toLowerCase();
-        if (lower === "all") {
-          return SUPPORTED_LEAGUES.slice();
-        }
-        if (SUPPORTED_LEAGUES.indexOf(lower) !== -1 && !seen[lower]) {
-          normalized.push(lower);
-          seen[lower] = true;
-        }
+        var lower = String(tokens[k]).toLowerCase();
+        if (lower === "all") return SUPPORTED_LEAGUES.slice();
+        if (SUPPORTED_LEAGUES.indexOf(lower) !== -1 && !seen[lower]) { out.push(lower); seen[lower] = true; }
       }
-      return normalized;
+      return out;
     },
 
     _extractModulePosition: function () {
@@ -503,16 +503,17 @@
     },
 
     _resolveConfiguredLeagues: function () {
+      var shared = this._leagueConfig();
+      if (shared) return shared.resolveConfiguredLeagues(this.config || {}, this._todayIsoInTimeZone());
       var cfg = this.config || {};
       var source = (typeof cfg.leagues !== "undefined") ? cfg.leagues : cfg.league;
-      var leagues = this._coerceLeagueArray(source);
-      if (!Array.isArray(leagues)) return [];
-      return this._filterSeasonalLeagues(this._expandMlbLeagueFamily(leagues));
+      return this._filterSeasonalLeagues(this._expandMlbLeagueFamily(this._coerceLeagueArray(source)));
     },
 
     _expandMlbLeagueFamily: function (leagues) {
-      if (!Array.isArray(leagues) || leagues.length === 0) return [];
-      return leagues.slice();
+      var shared = this._leagueConfig();
+      if (shared) return shared.expandMlbLeagueFamily(leagues);
+      return Array.isArray(leagues) ? leagues.slice() : [];
     },
 
     _rebuildLeagueRotation: function (preferredLeague) {
@@ -547,17 +548,23 @@
     },
 
     _isNhlBreakWindow: function (dateIso) {
-      return dateIso >= "2026-02-06" && dateIso <= "2026-02-24";
+      var shared = this._leagueConfig();
+      if (shared) return shared.isNhlBreakWindow(dateIso, this.config || {});
+      return dateIso >= (this.config.hideNhlFrom || "2026-02-06") && dateIso <= (this.config.hideNhlUntil || "2026-02-24");
     },
 
     _hideOlympicScoreboards: function (dateIso) {
-      return dateIso >= "2026-02-24";
+      var shared = this._leagueConfig();
+      if (shared) return shared.hideOlympicScoreboards(dateIso, this.config || {});
+      return dateIso >= (this.config.hideOlympicsFrom || "2026-02-24");
     },
 
     _filterSeasonalLeagues: function (leagues) {
+      var shared = this._leagueConfig();
+      if (shared) return shared.filterSeasonalLeagues(leagues, this.config || {}, this._todayIsoInTimeZone());
       var dateIso = this._todayIsoInTimeZone();
-      var hideNhl = this._isNhlBreakWindow(dateIso);
-      var hideOlympics = this._hideOlympicScoreboards(dateIso);
+      var hideNhl = this.config.seasonalFiltering !== false && this._isNhlBreakWindow(dateIso);
+      var hideOlympics = this.config.seasonalFiltering !== false && this._hideOlympicScoreboards(dateIso);
 
       return leagues.filter(function (league) {
         if (hideNhl && league === "nhl") return false;
@@ -575,6 +582,7 @@
       payload.activeLeague = this._getLeague();
       return payload;
     },
+
     _applyActiveLeagueState: function () {
       this._syncScoreboardLayout();
       var league = this._getLeague();
@@ -1355,6 +1363,24 @@
       return wrapper;
     },
 
+    _buildProviderStatus: function () {
+      var extras = this.currentExtras || {};
+      var shouldShow = this.config.showProviderStatus === true || extras.isStale || extras.fallbackUsed;
+      if (!shouldShow) return null;
+      var parts = [];
+      if (extras.isStale) parts.push("Showing cached data");
+      else if (extras.fallbackUsed) parts.push("Using fallback feed");
+      if (extras.provider || extras.providerUsed) parts.push("Source: " + (extras.provider || extras.providerUsed));
+      var stamp = extras.lastUpdatedAt || extras.fetchedAt || extras.fetchedAtUTC;
+      if (stamp) parts.push("Updated " + new Date(stamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
+      if (extras.staleReason && extras.isStale) parts.push(extras.staleReason);
+      if (parts.length === 0) return null;
+      var div = document.createElement("div");
+      div.className = "scoreboard-provider-status small dimmed";
+      div.innerText = parts.join(" • ");
+      return div;
+    },
+
     // ----------------- SCOREBOARD -----------------
     _buildGames: function () {
       this._syncScoreboardLayout();
@@ -1382,6 +1408,9 @@
       }
 
       this._setModuleContentWidth(widthPx);
+
+      var providerStatus = this._buildProviderStatus();
+      if (providerStatus) container.appendChild(providerStatus);
 
       var scoreboardPages = this._scoreboardPageCount || 0;
       var scoreboardRendered = false;

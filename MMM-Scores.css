@@ -691,3 +691,11 @@
 .scoreboard-card .team-highlight ~ .scoreboard-value.live {
   color: var(--scoreboard-value-color) !important;
 }
+
+.scoreboard-provider-status {
+  width: min(100%, var(--scoreboard-content-width, 100%));
+  text-align: center;
+  font-size: calc(var(--scoreboard-label-font) + 1pt);
+  letter-spacing: 0.08em;
+  color: var(--scoreboard-muted);
+}

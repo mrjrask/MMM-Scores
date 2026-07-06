@@ -5,6 +5,7 @@ const cheerio    = require("cheerio");
 const http       = require("http");
 const https      = require("https");
 const { URL }    = require("url");
+const LeagueConfig = require("./shared-league-config");
 
 function createHttpFetchFallback(maxRedirects = 5) {
   const requestOnce = (url, options, redirectsLeft) => new Promise((resolve, reject) => {
@@ -61,7 +62,7 @@ const fetch = (typeof global.fetch === "function")
   ? global.fetch.bind(global)
   : createHttpFetchFallback();
 
-const SUPPORTED_LEAGUES = ["mlb", "wbc", "nhl", "nfl", "nba", "worldcup", "olympic_mhockey", "olympic_whockey"];
+const { SUPPORTED_LEAGUES } = LeagueConfig;
 const MLB_SCOREBOARD_SPORT_IDS = [1, 51]; // MLB plus explicit international/WBC feeds, split before display
 const MLB_INTERNATIONAL_WBC_TEAM_IDS = new Set([
   776, // Brazil
@@ -130,6 +131,7 @@ module.exports = NodeHelper.create({
     this._nhlStatsRestStatus = { available: null, checkedAt: 0, warnedAt: 0 };
     this._providerCache = new Map();
     this._olympicLastGoodByLeague = {};
+    this._lastGoodByLeague = {};
   },
 
   socketNotificationReceived(notification, payload) {
@@ -152,34 +154,81 @@ module.exports = NodeHelper.create({
     }
   },
 
+
+  _requestTimeoutMs() {
+    const raw = Number(this.config && this.config.requestTimeoutMs);
+    return Number.isFinite(raw) && raw > 0 ? raw : 15000;
+  },
+
+  async _fetchResponse(url, options = {}, label = url) {
+    const timeoutMs = this._requestTimeoutMs();
+    const started = Date.now();
+    let timer = null;
+    let controller = null;
+    const requestOptions = Object.assign({}, options || {});
+
+    if (typeof AbortController !== "undefined") {
+      controller = new AbortController();
+      requestOptions.signal = controller.signal;
+      timer = setTimeout(() => controller.abort(), timeoutMs);
+    }
+
+    try {
+      const res = await fetch(url, requestOptions);
+      const elapsedMs = Date.now() - started;
+      if (!res || !res.ok) {
+        const status = res && typeof res.status !== "undefined" ? res.status : "?";
+        const statusText = res && res.statusText ? res.statusText : "";
+        throw new Error(`${label} failed with HTTP ${status} ${statusText} (${elapsedMs}ms)`);
+      }
+      return res;
+    } catch (err) {
+      if (err && err.name === "AbortError") {
+        throw new Error(`${label} timed out after ${timeoutMs}ms`);
+      }
+      throw err;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  },
+
+  async _fetchJson(url, options = {}, label = url) {
+    const res = await this._fetchResponse(url, options, label);
+    return res.json();
+  },
+
+  async _fetchText(url, options = {}, label = url) {
+    const res = await this._fetchResponse(url, options, label);
+    return res.text();
+  },
   async _fetchGames() {
     const leagues = Array.isArray(this.leagues) && this.leagues.length > 0
       ? this.leagues
       : [this._getLeague()];
 
-    for (let i = 0; i < leagues.length; i++) {
-      const league = leagues[i];
-      try {
-        if (league === "nhl") {
-          await this._fetchNhlGames();
-        } else if (league === "olympic_mhockey") {
-          await this._fetchOlympicHockeyGames("olympic_mhockey");
-        } else if (league === "olympic_whockey") {
-          await this._fetchOlympicHockeyGames("olympic_whockey");
-        } else if (league === "nfl") {
-          await this._fetchNflGames();
-        } else if (league === "nba") {
-          await this._fetchNbaGames();
-        } else if (league === "worldcup") {
-          await this._fetchWorldCupGames();
-        } else {
-          await this._fetchMlbGames();
-        }
-      } catch (err) {
-        console.error(`🚨 ${league} fetch loop failed:`, err);
-        this._notifyGames(league, []);
+    // League fetches are intentionally independent so one slow provider does not
+    // block the entire MagicMirror rotation.
+    const unique = Array.from(new Set(leagues.map((league) => league === "wbc" ? "mlb" : league)));
+    const tasks = unique.map((league) => this._fetchLeagueGames(league));
+    const results = await Promise.allSettled(tasks);
+
+    results.forEach((result, index) => {
+      if (result.status === "rejected") {
+        const league = unique[index];
+        console.error(`🚨 ${league} fetch loop failed:`, result.reason);
+        this._notifyGamesWithFallback(league, [], { errorMessage: result.reason && result.reason.message });
       }
-    }
+    });
+  },
+
+  async _fetchLeagueGames(league) {
+    if (league === "nhl") return this._fetchNhlGames();
+    if (league === "olympic_mhockey") return this._fetchOlympicHockeyGames("olympic_mhockey");
+    if (league === "olympic_whockey") return this._fetchOlympicHockeyGames("olympic_whockey");
+    if (league === "nfl") return this._fetchNflGames();
+    if (league === "nba") return this._fetchNbaGames();
+    if (league === "worldcup") return this._fetchWorldCupGames();
+    return this._fetchMlbGames();
   },
 
   async _fetchMlbGames() {
@@ -189,24 +238,18 @@ module.exports = NodeHelper.create({
       const gamesByPk = new Map();
       const scheduleByPk = new Map();
 
-      for (const sportId of MLB_SCOREBOARD_SPORT_IDS) {
-        const games = await this._fetchMlbGamesBySport(dateIso, sportId);
-        for (let i = 0; i < games.length; i += 1) {
-          const game = games[i];
-          const gamePk = Number(game && game.gamePk);
-          if (Number.isFinite(gamePk)) {
-            gamesByPk.set(gamePk, game);
-          }
-        }
+      const displayResults = await Promise.all(MLB_SCOREBOARD_SPORT_IDS.map((sportId) => this._fetchMlbGamesBySport(dateIso, sportId)));
+      displayResults.flat().forEach((game) => {
+        const gamePk = Number(game && game.gamePk);
+        if (Number.isFinite(gamePk)) gamesByPk.set(gamePk, game);
+      });
 
-        if (context.beforeUpdateCutoff) {
-          const scheduleGames = await this._fetchMlbGamesBySport(context.todayIso, sportId);
-          for (let i = 0; i < scheduleGames.length; i += 1) {
-            const game = scheduleGames[i];
-            const gamePk = Number(game && game.gamePk);
-            if (Number.isFinite(gamePk)) scheduleByPk.set(gamePk, game);
-          }
-        }
+      if (context.beforeUpdateCutoff) {
+        const scheduleResults = await Promise.all(MLB_SCOREBOARD_SPORT_IDS.map((sportId) => this._fetchMlbGamesBySport(context.todayIso, sportId)));
+        scheduleResults.flat().forEach((game) => {
+          const gamePk = Number(game && game.gamePk);
+          if (Number.isFinite(gamePk)) scheduleByPk.set(gamePk, game);
+        });
       }
 
       const games = Array.from(gamesByPk.values()).sort((a, b) => {
@@ -233,8 +276,8 @@ module.exports = NodeHelper.create({
       this._notifyGames("wbc", separatedGames.wbc, { scheduleGames: separatedSchedule.wbc, showingPreviousFinals: context.beforeUpdateCutoff });
     } catch (e) {
       console.error("🚨 MLB fetchGames failed:", e);
-      this._notifyGames("mlb", []);
-      this._notifyGames("wbc", []);
+      this._notifyGamesWithFallback("mlb", [], { errorMessage: e.message });
+      this._notifyGamesWithFallback("wbc", [], { errorMessage: e.message });
     }
   },
 
@@ -259,12 +302,7 @@ module.exports = NodeHelper.create({
 
   async _fetchMlbGamesBySport(dateIso, sportId) {
     const url = `https://statsapi.mlb.com/api/v1/schedule/games?sportId=${sportId}&date=${dateIso}&hydrate=linescore`;
-    const res = await fetch(url);
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status} ${res.statusText} (sportId=${sportId})`);
-    }
-
-    const json = await res.json();
+    const json = await this._fetchJson(url, {}, `MLB sportId=${sportId}`);
     const games = [];
     const dates = Array.isArray(json && json.dates) ? json.dates : [];
 
@@ -399,7 +437,7 @@ module.exports = NodeHelper.create({
 
     if (!delivered && !sent) {
       console.warn(`⚠️ Unable to fetch NHL games for ${targetDate}; sending empty schedule to front-end.`);
-      this._notifyGames("nhl", []);
+      this._notifyGamesWithFallback("nhl", [], { errorMessage: "Unable to fetch NHL games" });
     }
   },
 
@@ -436,12 +474,7 @@ module.exports = NodeHelper.create({
 
   async _fetchNhlStatsGames(dateIso) {
     const url = `https://statsapi.web.nhl.com/api/v1/schedule?date=${dateIso}&expand=schedule.linescore,schedule.teams`;
-    const res  = await fetch(url, { headers: this._nhlRequestHeaders() });
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status} ${res.statusText}`);
-    }
-
-    const json = await res.json();
+    const json = await this._fetchJson(url, { headers: this._nhlRequestHeaders() }, "NHL stats API");
     const dates = Array.isArray(json.dates) ? json.dates : [];
     const games = [];
     for (let i = 0; i < dates.length; i += 1) {
@@ -469,12 +502,7 @@ module.exports = NodeHelper.create({
     for (let u = 0; u < urls.length; u += 1) {
       const fallbackUrl = urls[u];
       try {
-        const res = await fetch(fallbackUrl, { headers });
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status} ${res.statusText}`);
-        }
-
-        const json = await res.json();
+        const json = await this._fetchJson(fallbackUrl, { headers }, `NHL scoreboard API ${u + 1}`);
         const rawGames = this._collectNhlScoreboardGames(json, dateIso);
         const normalized = [];
 
@@ -639,18 +667,16 @@ module.exports = NodeHelper.create({
     }
 
     const restUrl = `https://api.nhle.com/stats/rest/en/schedule?cayenneExp=gameDate=%22${dateIso}%22`;
-    const res = await fetch(restUrl, { headers: this._nhlRequestHeaders({
-      "x-nhl-stats-origin": "https://www.nhl.com",
-      "x-nhl-stats-referer": "https://www.nhl.com"
-    }) });
-    if (!res.ok) {
-      if (res.status === 404) {
-        this._markNhlStatsRestUnavailable();
-      }
-      throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    let json;
+    try {
+      json = await this._fetchJson(restUrl, { headers: this._nhlRequestHeaders({
+        "x-nhl-stats-origin": "https://www.nhl.com",
+        "x-nhl-stats-referer": "https://www.nhl.com"
+      }) }, "NHL stats REST API");
+    } catch (err) {
+      if (/HTTP 404/.test(String(err && err.message))) this._markNhlStatsRestUnavailable();
+      throw err;
     }
-
-    const json = await res.json();
     const rawGames = Array.isArray(json.data) ? json.data : [];
     const normalized = [];
 
@@ -1310,23 +1336,19 @@ module.exports = NodeHelper.create({
     } catch (e) {
       console.error(`🚨 ${leagueKey} fetchGames failed:`, e);
       const fallbackGames = Array.isArray(this._olympicLastGoodByLeague[leagueKey]) ? this._olympicLastGoodByLeague[leagueKey] : [];
-      this._notifyGames(leagueKey, this._normalizedGamesToLegacyEvents(fallbackGames));
+      this._notifyGamesWithFallback(leagueKey, this._normalizedGamesToLegacyEvents(fallbackGames), { errorMessage: e.message });
     }
   },
 
   async fetchOlympicScoreboardMen(dateIso, dateCompact) {
     const url = `https://site.api.espn.com/apis/site/v2/sports/hockey/mens-olympics/scoreboard?dates=${dateCompact || String(dateIso || "").replace(/-/g, "")}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-    const json = await res.json();
+    const json = await this._fetchJson(url, {}, "Olympic men's ESPN scoreboard");
     return this.normalizeEspnOlympicResponse(json, "olympic_mhockey", "espn_mens_olympics");
   },
 
   async fetchOlympicScoreboardWomen(dateIso, dateCompact) {
     const url = `https://site.api.espn.com/apis/site/v2/sports/hockey/womens-olympics/scoreboard?dates=${dateCompact || String(dateIso || "").replace(/-/g, "")}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-    const json = await res.json();
+    const json = await this._fetchJson(url, {}, "Olympic women's ESPN scoreboard");
     return this.normalizeEspnOlympicResponse(json, "olympic_whockey", "espn_womens_olympics");
   },
 
@@ -1499,19 +1521,13 @@ module.exports = NodeHelper.create({
     for (let i = 0; i < urls.length; i += 1) {
       const url = urls[i];
       try {
-        const res = await fetch(url, {
+        const html = await this._fetchText(url, {
           headers: {
             "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "accept-language": "en-US,en;q=0.9"
           }
-        });
-
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status} ${res.statusText}`);
-        }
-
-        const html = await res.text();
+        }, "Olympic ESPN results page");
         const roots = this._extractEspnPageStatePayloads(html);
         const rawGames = [];
 
@@ -1742,11 +1758,7 @@ module.exports = NodeHelper.create({
       const context = this._getScoreboardDateContext();
       const { dateIso, dateCompact } = context;
       const url = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${dateCompact}`;
-      const res = await fetch(url);
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status} ${res.statusText}`);
-      }
-      const json = await res.json();
+      const json = await this._fetchJson(url, {}, "NBA ESPN scoreboard");
       const events = this._collectEspnScoreboardEvents(json);
 
       events.sort((a, b) => {
@@ -1772,15 +1784,18 @@ module.exports = NodeHelper.create({
       let scheduleGames = [];
       if (context.beforeUpdateCutoff) {
         const scheduleUrl = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${context.todayCompact}`;
-        const scheduleRes = await fetch(scheduleUrl);
-        if (scheduleRes.ok) scheduleGames = this._collectEspnScoreboardEvents(await scheduleRes.json());
+        try {
+          scheduleGames = this._collectEspnScoreboardEvents(await this._fetchJson(scheduleUrl, {}, scheduleUrl));
+        } catch (scheduleError) {
+          console.warn(`⚠️ Schedule fetch failed for ${context.todayIso}:`, scheduleError.message || scheduleError);
+        }
       }
       const displayEvents = context.beforeUpdateCutoff ? this._finalGamesOnly(events) : events;
       console.log(`🏀 Sending ${displayEvents.length} NBA games for ${dateIso} to front-end.`);
       this._notifyGames("nba", displayEvents, { scheduleGames, showingPreviousFinals: context.beforeUpdateCutoff });
     } catch (e) {
       console.error("🚨 NBA fetchGames failed:", e);
-      this._notifyGames("nba", []);
+      this._notifyGamesWithFallback("nba", [], { errorMessage: e.message });
     }
   },
 
@@ -1818,12 +1833,7 @@ module.exports = NodeHelper.create({
       const context = this._getScoreboardDateContext();
       const { dateIso, dateCompact } = context;
       const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${dateCompact}`;
-      const res = await fetch(url);
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status} ${res.statusText}`);
-      }
-
-      const json = await res.json();
+      const json = await this._fetchJson(url, {}, url);
       const events = this._collectEspnScoreboardEvents(json);
 
       events.sort((a, b) => {
@@ -1849,15 +1859,18 @@ module.exports = NodeHelper.create({
       let scheduleGames = [];
       if (context.beforeUpdateCutoff) {
         const scheduleUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${context.todayCompact}`;
-        const scheduleRes = await fetch(scheduleUrl);
-        if (scheduleRes.ok) scheduleGames = this._collectEspnScoreboardEvents(await scheduleRes.json());
+        try {
+          scheduleGames = this._collectEspnScoreboardEvents(await this._fetchJson(scheduleUrl, {}, scheduleUrl));
+        } catch (scheduleError) {
+          console.warn(`⚠️ Schedule fetch failed for ${context.todayIso}:`, scheduleError.message || scheduleError);
+        }
       }
       const displayEvents = context.beforeUpdateCutoff ? this._finalGamesOnly(events) : events;
       console.log(`⚽ Sending ${displayEvents.length} World Cup games for ${dateIso} to front-end.`);
       this._notifyGames("worldcup", displayEvents, { scheduleGames, showingPreviousFinals: context.beforeUpdateCutoff });
     } catch (e) {
       console.error("🚨 World Cup fetchGames failed:", e);
-      this._notifyGames("worldcup", []);
+      this._notifyGamesWithFallback("worldcup", [], { errorMessage: e.message });
     }
   },
 
@@ -1924,7 +1937,7 @@ module.exports = NodeHelper.create({
       this._notifyGames("nfl", games, extras);
     } catch (e) {
       console.error("🚨 NFL fetchGames failed:", e);
-      this._notifyGames("nfl", [], { teamsOnBye: [] });
+      this._notifyGamesWithFallback("nfl", [], { teamsOnBye: [], errorMessage: e.message });
     }
   },
 
@@ -1932,19 +1945,19 @@ module.exports = NodeHelper.create({
     const aggregated = new Map();
     const byeTeams = new Map();
 
-    for (let i = 0; i < dateIsos.length; i += 1) {
-      const dateIso = dateIsos[i];
+    const results = await Promise.allSettled(dateIsos.map(async (dateIso) => {
       const dateCompact = dateIso.replace(/-/g, "");
       const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=${dateCompact}`;
+      return { dateIso, json: await this._fetchJson(url, {}, `NFL scoreboard ${dateIso}`) };
+    }));
 
-      try {
-        const res = await fetch(url);
-        const json = await res.json();
-        this._mergeNflScoreboardResponse(json, aggregated, byeTeams, dateIso);
-      } catch (err) {
-        console.error(`🚨 NFL fetchGames failed for ${dateIso}:`, err);
+    results.forEach((result) => {
+      if (result.status === "fulfilled") {
+        this._mergeNflScoreboardResponse(result.value.json, aggregated, byeTeams, result.value.dateIso);
+      } else {
+        console.error("🚨 NFL fetchGames failed for one date:", result.reason);
       }
-    }
+    });
 
     return this._finalizeNflWeekResults(aggregated, byeTeams);
   },
@@ -1955,8 +1968,7 @@ module.exports = NodeHelper.create({
     const url = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
 
     try {
-      const res = await fetch(url);
-      const json = await res.json();
+      const json = await this._fetchJson(url, {}, "NFL default scoreboard");
       this._mergeNflScoreboardResponse(json, aggregated, byeTeams, "current");
     } catch (err) {
       console.error("🚨 NFL fallback scoreboard fetch failed:", err);
@@ -2192,7 +2204,11 @@ module.exports = NodeHelper.create({
       normalizedGames = [];
     }
 
-    const payload = { league: normalizedLeague, games: normalizedGames };
+    const payload = {
+      league: normalizedLeague,
+      games: normalizedGames,
+      fetchedAt: new Date().toISOString()
+    };
 
     if (extras && typeof extras === "object") {
       Object.keys(extras).forEach((key) => {
@@ -2200,63 +2216,52 @@ module.exports = NodeHelper.create({
       });
     }
 
+    if (!payload.isStale && (normalizedGames.length > 0 || (payload.scheduleGames && payload.scheduleGames.length > 0))) {
+      if (!this._lastGoodByLeague) this._lastGoodByLeague = {};
+      this._lastGoodByLeague[normalizedLeague] = Object.assign({}, payload, {
+        games: normalizedGames.slice(),
+        scheduleGames: Array.isArray(payload.scheduleGames) ? payload.scheduleGames.slice() : payload.scheduleGames,
+        lastUpdatedAt: payload.fetchedAt
+      });
+    }
+
     this.sendSocketNotification("GAMES", payload);
   },
 
+  _notifyGamesWithFallback(league, games = [], extras = null) {
+    const normalizedLeague = this._normalizeLeagueKey(league) || this._getLeague();
+    const cache = this._lastGoodByLeague && this._lastGoodByLeague[normalizedLeague];
+    const ttlRaw = Number(this.config && this.config.lastGoodCacheMs);
+    const ttlMs = Number.isFinite(ttlRaw) && ttlRaw > 0 ? ttlRaw : 6 * 60 * 60 * 1000;
+    if (cache && cache.lastUpdatedAt && (Date.now() - Date.parse(cache.lastUpdatedAt)) <= ttlMs) {
+      const payload = Object.assign({}, cache, extras || {}, {
+        league: normalizedLeague,
+        isStale: true,
+        fallbackUsed: true,
+        staleReason: extras && extras.errorMessage ? extras.errorMessage : "Using last successful scoreboard response",
+        fetchedAt: new Date().toISOString(),
+        games: Array.isArray(cache.games) ? cache.games.slice() : []
+      });
+      this.sendSocketNotification("GAMES", payload);
+      return;
+    }
+    this._notifyGames(normalizedLeague, games, extras);
+  },
+
   _normalizeLeagueKey(value) {
-    if (value == null) return null;
-    const str = String(value).trim().toLowerCase();
-    return SUPPORTED_LEAGUES.includes(str) ? str : null;
+    return LeagueConfig.normalizeLeagueKey(value);
   },
 
   _coerceLeagueArray(input) {
-    const tokens = [];
-    const collect = (entry) => {
-      if (entry == null) return;
-      if (Array.isArray(entry)) {
-        for (let i = 0; i < entry.length; i += 1) collect(entry[i]);
-        return;
-      }
-      const str = String(entry).trim();
-      if (!str) return;
-      const parts = str.split(/[\s,]+/);
-      for (let j = 0; j < parts.length; j += 1) {
-        const part = parts[j].trim();
-        if (part) tokens.push(part);
-      }
-    };
-
-    collect(input);
-
-    const normalized = [];
-    const seen = new Set();
-    for (let k = 0; k < tokens.length; k += 1) {
-      const token = tokens[k];
-      const lower = token.toLowerCase();
-      if (lower === "all") {
-        return SUPPORTED_LEAGUES.slice();
-      }
-      if (SUPPORTED_LEAGUES.includes(lower) && !seen.has(lower)) {
-        normalized.push(lower);
-        seen.add(lower);
-      }
-    }
-    return normalized;
+    return LeagueConfig.coerceLeagueArray(input);
   },
 
   _resolveConfiguredLeagues() {
-    const cfg = this.config || {};
-    const source = (typeof cfg.leagues !== "undefined") ? cfg.leagues : cfg.league;
-    const leagues = this._coerceLeagueArray(source);
-    if (!Array.isArray(leagues)) return [];
-    return this._filterSeasonalLeagues(this._expandMlbLeagueFamily(leagues));
+    return LeagueConfig.resolveConfiguredLeagues(this.config || {}, this._todayIsoInTimeZone());
   },
 
-
-
   _expandMlbLeagueFamily(leagues) {
-    if (!Array.isArray(leagues) || leagues.length === 0) return [];
-    return leagues.slice();
+    return LeagueConfig.expandMlbLeagueFamily(leagues);
   },
 
   _todayIsoInTimeZone() {
@@ -2265,23 +2270,15 @@ module.exports = NodeHelper.create({
   },
 
   _isNhlBreakWindow(dateIso) {
-    return dateIso >= "2026-02-06" && dateIso <= "2026-02-24";
+    return LeagueConfig.isNhlBreakWindow(dateIso, this.config || {});
   },
 
   _hideOlympicScoreboards(dateIso) {
-    return dateIso >= "2026-02-24";
+    return LeagueConfig.hideOlympicScoreboards(dateIso, this.config || {});
   },
 
   _filterSeasonalLeagues(leagues) {
-    const dateIso = this._todayIsoInTimeZone();
-    const hideNhl = this._isNhlBreakWindow(dateIso);
-    const hideOlympics = this._hideOlympicScoreboards(dateIso);
-
-    return leagues.filter((league) => {
-      if (hideNhl && league === "nhl") return false;
-      if (hideOlympics && (league === "olympic_mhockey" || league === "olympic_whockey")) return false;
-      return true;
-    });
+    return LeagueConfig.filterSeasonalLeagues(leagues, this.config || {}, this._todayIsoInTimeZone());
   },
 
   _getTargetDate(options) {
