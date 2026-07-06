@@ -5,7 +5,9 @@
   "main": "MMM-Scores.js",
   "scripts": {
     "test:api": "node scripts/test-api-connections.js",
-    "test:olympic": "node scripts/test-olympic-hockey.js"
+    "test:olympic": "node scripts/test-olympic-hockey.js",
+    "test": "node --test test/*.test.js",
+    "check:assets": "node scripts/check-assets.js"
   },
   "repository": {
     "type": "git",
