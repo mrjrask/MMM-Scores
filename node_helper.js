@@ -2272,7 +2272,7 @@ module.exports = NodeHelper.create({
       });
     }
 
-    if (!payload.isStale) {
+    if (!payload.isStale && !payload.errorMessage) {
       if (!this._lastGoodByLeague) this._lastGoodByLeague = {};
       this._lastGoodByLeague[normalizedLeague] = Object.assign({}, payload, {
         games: normalizedGames.slice(),
