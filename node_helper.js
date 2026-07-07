@@ -8,6 +8,12 @@ const { URL }    = require("url");
 const LeagueConfig = require("./shared-league-config");
 
 function createHttpFetchFallback(maxRedirects = 5) {
+  const createAbortError = () => {
+    const error = new Error("The operation was aborted");
+    error.name = "AbortError";
+    return error;
+  };
+
   const requestOnce = (url, options, redirectsLeft) => new Promise((resolve, reject) => {
     let parsed;
     try {
@@ -17,23 +23,49 @@ function createHttpFetchFallback(maxRedirects = 5) {
       return;
     }
 
+    const signal = options && options.signal;
+    if (signal && signal.aborted) {
+      reject(createAbortError());
+      return;
+    }
+
     const transport = parsed.protocol === "https:" ? https : http;
+    let resRef = null;
+    let settled = false;
+    let abortHandler = null;
+
+    const cleanup = () => {
+      if (signal && abortHandler && typeof signal.removeEventListener === "function") {
+        signal.removeEventListener("abort", abortHandler);
+      }
+      abortHandler = null;
+    };
+
+    const settle = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback(value);
+    };
+
     const req = transport.request(parsed, {
       method: (options && options.method) || "GET",
       headers: (options && options.headers) || {}
     }, (res) => {
+      resRef = res;
       const status = Number(res.statusCode) || 0;
       const location = res.headers && res.headers.location;
 
       if (status >= 300 && status < 400 && location && redirectsLeft > 0) {
         const redirectUrl = new URL(location, parsed).toString();
         res.resume();
-        resolve(requestOnce(redirectUrl, options, redirectsLeft - 1));
+        settle(resolve, requestOnce(redirectUrl, options, redirectsLeft - 1));
         return;
       }
 
       const chunks = [];
       res.on("data", (chunk) => chunks.push(chunk));
+      res.on("error", (error) => settle(reject, error));
       res.on("end", () => {
         const body = Buffer.concat(chunks).toString("utf8");
         const response = {
@@ -44,11 +76,32 @@ function createHttpFetchFallback(maxRedirects = 5) {
           text: async () => body,
           json: async () => JSON.parse(body)
         };
-        resolve(response);
+        settle(resolve, response);
       });
     });
 
-    req.on("error", reject);
+    abortHandler = () => {
+      const error = createAbortError();
+      if (resRef && typeof resRef.destroy === "function") resRef.destroy(error);
+      req.destroy(error);
+      settle(reject, error);
+    };
+
+    if (signal && typeof signal.addEventListener === "function") {
+      signal.addEventListener("abort", abortHandler, { once: true });
+    }
+
+    const requestTimeout = Number(options && options.timeout);
+    if (Number.isFinite(requestTimeout) && requestTimeout > 0) {
+      req.setTimeout(requestTimeout, () => {
+        const error = new Error(`Request timed out after ${requestTimeout}ms`);
+        error.name = "AbortError";
+        req.destroy(error);
+        settle(reject, error);
+      });
+    }
+
+    req.on("error", (error) => settle(reject, error));
 
     const body = options && options.body;
     if (typeof body !== "undefined" && body !== null) req.write(body);
@@ -166,6 +219,9 @@ module.exports = NodeHelper.create({
     let timer = null;
     let controller = null;
     const requestOptions = Object.assign({}, options || {});
+    if (typeof requestOptions.timeout === "undefined") {
+      requestOptions.timeout = timeoutMs;
+    }
 
     if (typeof AbortController !== "undefined") {
       controller = new AbortController();
@@ -2216,7 +2272,7 @@ module.exports = NodeHelper.create({
       });
     }
 
-    if (!payload.isStale && (normalizedGames.length > 0 || (payload.scheduleGames && payload.scheduleGames.length > 0))) {
+    if (!payload.isStale) {
       if (!this._lastGoodByLeague) this._lastGoodByLeague = {};
       this._lastGoodByLeague[normalizedLeague] = Object.assign({}, payload, {
         games: normalizedGames.slice(),
