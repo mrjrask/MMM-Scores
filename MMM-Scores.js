@@ -2686,12 +2686,7 @@
 
     _setScoreboardStatusText: function (statusEl, statusText, league) {
       var text = statusText || "";
-      if (league !== "worldcup") {
-        statusEl.textContent = text;
-        return;
-      }
-
-      var match = text.match(/^(.*?)([AP]M)$/i);
+      var match = text.match(/^(.*?\d(?::\d{2})?)\s*([AP]M)$/i);
       if (!match) {
         statusEl.textContent = text;
         return;
