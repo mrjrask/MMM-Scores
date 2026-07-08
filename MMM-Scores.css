@@ -746,3 +746,8 @@
 .scoreboard-round-label-right {
   text-align: right;
 }
+
+.scoreboard-card.league-worldcup.is-preview .scoreboard-value.scoreboard-pregame-team-abbr {
+  font-size: var(--scoreboard-status-font);
+  line-height: 1.1;
+}
