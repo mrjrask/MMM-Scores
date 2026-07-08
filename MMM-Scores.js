@@ -2160,7 +2160,7 @@
           {
             value: goals,
             placeholder: "—",
-            superscript: (shootoutScore != null) ? ("SO " + shootoutScore) : (i === 0 ? awayShots : homeShots),
+            superscript: (shootoutScore != null) ? shootoutScore : (i === 0 ? awayShots : homeShots),
             superscriptClass: (shootoutScore != null) ? "shootout-superscript" : "shots-on-goal-superscript"
           }
         ];
