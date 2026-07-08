@@ -282,17 +282,32 @@
   overflow: hidden;
 }
 
+.scoreboard-card.league-nhl,
+.scoreboard-card.league-olympic_mhockey,
+.scoreboard-card.league-olympic_whockey {
+  overflow: visible;
+}
+
 .scoreboard-card.league-nhl .scoreboard-header,
 .scoreboard-card.league-olympic_mhockey .scoreboard-header,
 .scoreboard-card.league-olympic_whockey .scoreboard-header {
   position: relative;
+  z-index: 3;
+  overflow: visible;
+}
+
+.scoreboard-card.league-nhl .scoreboard-body,
+.scoreboard-card.league-olympic_mhockey .scoreboard-body,
+.scoreboard-card.league-olympic_whockey .scoreboard-body {
+  position: relative;
+  z-index: 1;
 }
 
 .scoreboard-card.league-nhl .scoreboard-status,
 .scoreboard-card.league-olympic_mhockey .scoreboard-status,
 .scoreboard-card.league-olympic_whockey .scoreboard-status {
   position: relative;
-  z-index: 1;
+  z-index: 4;
   flex-wrap: nowrap;
   white-space: nowrap;
   overflow: visible;
