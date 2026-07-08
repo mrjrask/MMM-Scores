@@ -2056,7 +2056,8 @@
 
       var isPostponed = /postponed/i.test(detailed);
       var isSuspended = /suspended/i.test(detailed);
-      var isPreview = state === "preview" || state === "pre" || state === "scheduled";
+      var isWarmup = /warm\s*up/i.test(detailed) || /warm\s*up/i.test(state);
+      var isPreview = !isWarmup && (state === "preview" || state === "pre" || state === "scheduled");
       var isFinal = state === "final" || state === "post" || !!statusType.completed || !!competitionStatusType.completed;
       var isLive = !isFinal && !isPreview && !isPostponed && !isSuspended;
 
@@ -2098,6 +2099,7 @@
       else if (isPreview) cardClasses.push("is-preview");
       else if (isPostponed) cardClasses.push("is-postponed");
       else if (isSuspended) cardClasses.push("is-suspended");
+      else if (isWarmup) cardClasses.push("is-warmup");
 
       var teams = (game && game.teams) || {};
       var away = teams.away || null;
@@ -2196,7 +2198,7 @@
         });
       }
 
-      if (!showVals && this._rowsContainValues(rows)) showVals = true;
+      if (!showVals && league !== "worldcup" && this._rowsContainValues(rows)) showVals = true;
 
       return this._createScoreboardCard({
         league: league,
