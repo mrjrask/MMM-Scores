@@ -1884,13 +1884,108 @@ module.exports = NodeHelper.create({
     return collected;
   },
 
+  _worldCupFinalRoundWindow(todayIso) {
+    const date = String(todayIso || "");
+    const windows = [
+      {
+        key: "quarterfinals",
+        label: "Quarterfinals",
+        fetchStartIso: "2026-07-08",
+        fetchEndIso: "2026-07-11",
+        displayStartIso: "2026-07-08",
+        displayEndIso: "2026-07-12"
+      },
+      {
+        key: "semifinals",
+        label: "Semifinals",
+        fetchStartIso: "2026-07-14",
+        fetchEndIso: "2026-07-15",
+        displayStartIso: "2026-07-13",
+        displayEndIso: "2026-07-16"
+      },
+      {
+        key: "finals",
+        label: "Finals",
+        fetchStartIso: "2026-07-18",
+        fetchEndIso: "2026-07-19",
+        displayStartIso: "2026-07-17",
+        displayEndIso: "2026-07-20"
+      }
+    ];
+
+    for (let i = 0; i < windows.length; i += 1) {
+      const window = windows[i];
+      if (date >= window.displayStartIso && date <= window.displayEndIso) return window;
+    }
+
+    return null;
+  },
+
+  _worldCupRoundDateCompact(window) {
+    if (!window) return null;
+    const start = String(window.fetchStartIso || "").replace(/-/g, "");
+    const end = String(window.fetchEndIso || "").replace(/-/g, "");
+    if (!start || !end) return null;
+    return start === end ? start : `${start}-${end}`;
+  },
+
+  _annotateWorldCupFinalRoundEvents(events, window) {
+    if (!Array.isArray(events) || !window) return events;
+    return events.map((event) => {
+      if (!event || typeof event !== "object") return event;
+      return Object.assign({}, event, { worldCupRoundLabel: window.label, worldCupRoundKey: window.key });
+    });
+  },
+
+  _worldCupFinalsDisplayWeight(event) {
+    const text = [
+      event && event.name,
+      event && event.shortName,
+      event && event.season && event.season.displayName,
+      event && event.competitions && event.competitions[0] && event.competitions[0].notes && event.competitions[0].notes[0] && event.competitions[0].notes[0].headline
+    ].filter(Boolean).join(" ").toLowerCase();
+
+    if (/third|3rd|third-place|3rd-place|bronze/.test(text)) return 1;
+    if (/final|championship/.test(text)) return 0;
+    return 0;
+  },
+
+  _orderWorldCupFinals(events, window) {
+    if (!Array.isArray(events) || !window || window.key !== "finals") return events;
+    return events.slice().sort((a, b) => {
+      const weightA = this._worldCupFinalsDisplayWeight(a);
+      const weightB = this._worldCupFinalsDisplayWeight(b);
+      if (weightA !== weightB) return weightA - weightB;
+
+      const dateA = this._firstDate(
+        a && a.date,
+        a && a.startDate,
+        a && a.startTimeUTC,
+        a && a.competitions && a.competitions[0] && (a.competitions[0].date || a.competitions[0].startDate || a.competitions[0].startTimeUTC)
+      );
+      const dateB = this._firstDate(
+        b && b.date,
+        b && b.startDate,
+        b && b.startTimeUTC,
+        b && b.competitions && b.competitions[0] && (b.competitions[0].date || b.competitions[0].startDate || b.competitions[0].startTimeUTC)
+      );
+
+      if (dateA && dateB) return dateB - dateA;
+      if (dateA) return -1;
+      if (dateB) return 1;
+      return 0;
+    });
+  },
+
   async _fetchWorldCupGames() {
     try {
       const context = this._getScoreboardDateContext();
+      const roundWindow = this._worldCupFinalRoundWindow(context.todayIso);
       const { dateIso, dateCompact } = context;
-      const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${dateCompact}`;
+      const worldCupDates = this._worldCupRoundDateCompact(roundWindow) || dateCompact;
+      const url = `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${worldCupDates}`;
       const json = await this._fetchJson(url, {}, url);
-      const events = this._collectEspnScoreboardEvents(json);
+      const events = this._annotateWorldCupFinalRoundEvents(this._collectEspnScoreboardEvents(json), roundWindow);
 
       events.sort((a, b) => {
         const dateA = this._firstDate(
@@ -1913,7 +2008,7 @@ module.exports = NodeHelper.create({
       });
 
       let scheduleGames = [];
-      if (context.beforeUpdateCutoff) {
+      if (!roundWindow && context.beforeUpdateCutoff) {
         const scheduleUrl = `https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${context.todayCompact}`;
         try {
           scheduleGames = this._collectEspnScoreboardEvents(await this._fetchJson(scheduleUrl, {}, scheduleUrl));
@@ -1921,9 +2016,15 @@ module.exports = NodeHelper.create({
           console.warn(`⚠️ Schedule fetch failed for ${context.todayIso}:`, scheduleError.message || scheduleError);
         }
       }
-      const displayEvents = context.beforeUpdateCutoff ? this._finalGamesOnly(events) : events;
-      console.log(`⚽ Sending ${displayEvents.length} World Cup games for ${dateIso} to front-end.`);
-      this._notifyGames("worldcup", displayEvents, { scheduleGames, showingPreviousFinals: context.beforeUpdateCutoff });
+      const roundEvents = this._orderWorldCupFinals(events, roundWindow);
+      const displayEvents = (!roundWindow && context.beforeUpdateCutoff) ? this._finalGamesOnly(roundEvents) : roundEvents;
+      const extras = { scheduleGames, showingPreviousFinals: !roundWindow && context.beforeUpdateCutoff };
+      if (roundWindow) {
+        extras.worldCupRoundKey = roundWindow.key;
+        extras.worldCupRoundLabel = roundWindow.label;
+      }
+      console.log(`⚽ Sending ${displayEvents.length} World Cup games for ${roundWindow ? worldCupDates : dateIso} to front-end.`);
+      this._notifyGames("worldcup", displayEvents, extras);
     } catch (e) {
       console.error("🚨 World Cup fetchGames failed:", e);
       this._notifyGamesWithFallback("worldcup", [], { errorMessage: e.message });
