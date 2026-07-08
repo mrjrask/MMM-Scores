@@ -731,6 +731,10 @@
   font-weight: 700;
 }
 
+.games-layout.league-worldcup .scoreboard-round-label {
+  margin-bottom: calc(var(--matrix-gap) * -0.75);
+}
+
 .scoreboard-round-label-left {
   text-align: left;
 }
