@@ -1412,6 +1412,13 @@
       var providerStatus = this._buildProviderStatus();
       if (providerStatus) container.appendChild(providerStatus);
 
+      if (activeLeague === "worldcup" && this.currentExtras && this.currentExtras.worldCupRoundLabel) {
+        var roundLabel = document.createElement("div");
+        roundLabel.className = "scoreboard-round-label";
+        roundLabel.innerText = this.currentExtras.worldCupRoundLabel;
+        container.appendChild(roundLabel);
+      }
+
       var scoreboardPages = this._scoreboardPageCount || 0;
       var scoreboardRendered = false;
 

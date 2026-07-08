@@ -699,3 +699,13 @@
   letter-spacing: 0.08em;
   color: var(--scoreboard-muted);
 }
+
+.scoreboard-round-label {
+  width: min(100%, var(--scoreboard-content-width, 100%));
+  text-align: center;
+  font-size: calc(var(--scoreboard-label-font) + 2pt);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--scoreboard-muted);
+  font-weight: 700;
+}
