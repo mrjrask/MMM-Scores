@@ -345,6 +345,7 @@
       this.rotateTimer    = null;
       this._headerStyleInjectedFor = null;
       this._rightPlacement = this._detectRightPlacement(false);
+      this._placementAlignment = this._detectPlacementAlignment(false);
       this._placementCheckTimer = null;
       this._lastRenderedDom = null;
       this._activeWidthSyncTimer = null;
@@ -445,11 +446,18 @@
     },
 
     _detectRightPlacement: function (allowDom) {
+      var alignment = this._detectPlacementAlignment(allowDom);
+      if (alignment === "right") return true;
+      if (alignment === "left" || alignment === "center") return false;
+      return null;
+    },
+
+    _detectPlacementAlignment: function (allowDom) {
       var pos = this._extractModulePosition();
       if (pos) {
-        if (pos.indexOf("_right") !== -1 || /(^|_|-)right$/i.test(pos)) return true;
-        if (pos.indexOf("_left") !== -1 || /(^|_|-)left$/i.test(pos)) return false;
-        if (pos.indexOf("_center") !== -1 || /(^|_|-)center$/i.test(pos)) return false;
+        if (pos.indexOf("_right") !== -1 || /(^|_|-)right$/i.test(pos)) return "right";
+        if (pos.indexOf("_left") !== -1 || /(^|_|-)left$/i.test(pos)) return "left";
+        if (pos.indexOf("_center") !== -1 || /(^|_|-)center$/i.test(pos)) return "center";
       }
 
       if (allowDom !== false && typeof document !== "undefined" && document.getElementById) {
@@ -459,8 +467,10 @@
         var node = dom;
         while (node) {
           if (node.classList && node.classList.contains("region")) {
-            if (node.classList.contains("right")) return true;
-            return false;
+            if (node.classList.contains("right")) return "right";
+            if (node.classList.contains("left")) return "left";
+            if (node.classList.contains("center")) return "center";
+            return null;
           }
           node = node.parentElement;
         }
@@ -491,9 +501,11 @@
     },
 
     _verifyPlacementFromDom: function () {
-      var detected = this._detectRightPlacement(true);
-      if (typeof detected === "boolean") {
-        if (detected !== this._rightPlacement) {
+      var alignment = this._detectPlacementAlignment(true);
+      if (alignment) {
+        var detected = alignment === "right";
+        if (alignment !== this._placementAlignment || detected !== this._rightPlacement) {
+          this._placementAlignment = alignment;
           this._rightPlacement = detected;
           this.updateDom();
         }
@@ -1414,7 +1426,8 @@
 
       if (activeLeague === "worldcup" && this.currentExtras && this.currentExtras.worldCupRoundLabel) {
         var roundLabel = document.createElement("div");
-        roundLabel.className = "scoreboard-round-label";
+        var alignment = this._placementAlignment || this._detectPlacementAlignment(false) || "center";
+        roundLabel.className = "scoreboard-round-label scoreboard-round-label-" + alignment;
         roundLabel.innerText = this.currentExtras.worldCupRoundLabel;
         container.appendChild(roundLabel);
       }
@@ -2669,6 +2682,44 @@
       try {
         var date = new Date(isoDate);
         if (isNaN(date.getTime())) return "";
+        var tz = this.config.timeZone || "America/Chicago";
+        var timeText = date.toLocaleTimeString("en-US", {
+          timeZone: tz,
+          hour12: true,
+          hour: "numeric",
+          minute: "2-digit"
+        });
+        var gameDate = this._formatDateIsoForTimeZone(date, tz);
+        var today = this._todayIsoInTimeZone();
+        if (gameDate && today && gameDate !== today) {
+          var weekday = date.toLocaleDateString("en-US", {
+            timeZone: tz,
+            weekday: "short"
+          });
+          if (weekday) return weekday + " " + timeText;
+        }
+        return timeText;
+      } catch (e) {
+        return "";
+      }
+    },
+
+    _formatDateIsoForTimeZone: function (date, timeZone) {
+      if (!(date instanceof Date) || isNaN(date.getTime())) return "";
+      try {
+        return date.toLocaleDateString("en-CA", {
+          timeZone: timeZone || this.config.timeZone || "America/Chicago"
+        });
+      } catch (e) {
+        return "";
+      }
+    },
+
+    _formatTimeOnly: function (isoDate) {
+      if (!isoDate) return "";
+      try {
+        var date = new Date(isoDate);
+        if (isNaN(date.getTime())) return "";
         return date.toLocaleTimeString("en-US", {
           timeZone: this.config.timeZone || "America/Chicago",
           hour12: true,
@@ -2687,14 +2738,16 @@
         var date = new Date(isoDate);
         if (isNaN(date.getTime())) return timeText;
         var tz = this.config.timeZone || "America/Chicago";
+        if (this._formatDateIsoForTimeZone(date, tz) !== this._todayIsoInTimeZone()) return timeText;
         var weekday = date.toLocaleDateString("en-US", {
           timeZone: tz,
           weekday: "short"
         });
         if (!weekday) return timeText;
         if (/^sun/i.test(weekday)) return timeText;
+        timeText = this._formatTimeOnly(isoDate);
         if (!timeText) return weekday;
-        return weekday + " " + timeText;
+        return timeText;
       } catch (e) {
         return timeText;
       }

@@ -709,3 +709,15 @@
   color: var(--scoreboard-muted);
   font-weight: 700;
 }
+
+.scoreboard-round-label-left {
+  text-align: left;
+}
+
+.scoreboard-round-label-center {
+  text-align: center;
+}
+
+.scoreboard-round-label-right {
+  text-align: right;
+}
