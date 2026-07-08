@@ -1685,7 +1685,7 @@
 
       var statusEl = document.createElement("div");
       statusEl.className = "scoreboard-status" + (live ? " live" : "");
-      statusEl.textContent = (config && config.statusText) ? config.statusText : "";
+      this._setScoreboardStatusText(statusEl, (config && config.statusText) ? config.statusText : "", league);
       if (config && config.statusIndicator) {
         statusEl.appendChild(config.statusIndicator);
       }
@@ -2665,7 +2665,7 @@
         });
       }
 
-      if (!showVals && this._rowsContainValues(rows)) showVals = true;
+      if (!showVals && league !== "worldcup" && this._rowsContainValues(rows)) showVals = true;
 
       return this._createScoreboardCard({
         league: league,
@@ -2676,6 +2676,30 @@
         rows: rows,
         cardClasses: cardClasses
       });
+    },
+
+    _compactMeridiem: function (timeText) {
+      return (timeText || "").replace(/\s+([AP]M)$/i, "$1");
+    },
+
+    _setScoreboardStatusText: function (statusEl, statusText, league) {
+      var text = statusText || "";
+      if (league !== "worldcup") {
+        statusEl.textContent = text;
+        return;
+      }
+
+      var match = text.match(/^(.*?)([AP]M)$/i);
+      if (!match) {
+        statusEl.textContent = text;
+        return;
+      }
+
+      statusEl.textContent = match[1];
+      var meridiemEl = document.createElement("span");
+      meridiemEl.className = "scoreboard-status-meridiem";
+      meridiemEl.textContent = match[2].toUpperCase();
+      statusEl.appendChild(meridiemEl);
     },
 
     _formatStartTime: function (isoDate) {
@@ -2730,6 +2754,7 @@
             minute: "2-digit"
           })
           : compactTime;
+        timeText = this._compactMeridiem(timeText);
         var gameDate = this._formatDateIsoForTimeZone(date, tz);
         var today = this._todayIsoInTimeZone();
         if (gameDate && today && gameDate !== today) {
