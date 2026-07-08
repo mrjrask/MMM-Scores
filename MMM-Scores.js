@@ -2069,7 +2069,8 @@
         statusText = "Suspended";
       } else if (isPreview) {
         var competitionDate = game && game.competitions && game.competitions[0] && game.competitions[0].date;
-        statusText = this._formatStartTime(game && (game.gameDate || game.startTimeUTC || game.date || competitionDate));
+        var startDate = game && (game.gameDate || game.startTimeUTC || game.date || competitionDate);
+        statusText = league === "worldcup" ? this._formatWorldCupStartTime(startDate) : this._formatStartTime(startDate);
       } else if (isFinal) {
         statusText = detailed || "Final";
       } else if (isLive) {
@@ -2689,6 +2690,46 @@
           hour: "numeric",
           minute: "2-digit"
         });
+        var gameDate = this._formatDateIsoForTimeZone(date, tz);
+        var today = this._todayIsoInTimeZone();
+        if (gameDate && today && gameDate !== today) {
+          var weekday = date.toLocaleDateString("en-US", {
+            timeZone: tz,
+            weekday: "short"
+          });
+          if (weekday) return weekday + " " + timeText;
+        }
+        return timeText;
+      } catch (e) {
+        return "";
+      }
+    },
+
+    _formatWorldCupStartTime: function (isoDate) {
+      if (!isoDate) return "";
+      try {
+        var date = new Date(isoDate);
+        if (isNaN(date.getTime())) return "";
+        var tz = this.config.timeZone || "America/Chicago";
+        var parts = date.toLocaleTimeString("en-US", {
+          timeZone: tz,
+          hour12: true,
+          hour: "numeric",
+          minute: "2-digit"
+        }).split(":");
+        var compactTime = date.toLocaleTimeString("en-US", {
+          timeZone: tz,
+          hour12: true,
+          hour: "numeric"
+        });
+        var timeText = (parts.length > 1 && parts[1].indexOf("00") !== 0)
+          ? date.toLocaleTimeString("en-US", {
+            timeZone: tz,
+            hour12: true,
+            hour: "numeric",
+            minute: "2-digit"
+          })
+          : compactTime;
         var gameDate = this._formatDateIsoForTimeZone(date, tz);
         var today = this._todayIsoInTimeZone();
         if (gameDate && today && gameDate !== today) {
