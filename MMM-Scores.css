@@ -338,7 +338,7 @@
   color: var(--scoreboard-value-color);
 }
 
-.scoreboard-card.league-worldcup .scoreboard-status-meridiem {
+.scoreboard-card .scoreboard-status-meridiem {
   font-size: 0.72em;
   line-height: 1;
   vertical-align: 0.18em;
