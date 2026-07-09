@@ -4,8 +4,6 @@ const dns        = require("dns");
 const cheerio    = require("cheerio");
 const http       = require("http");
 const https      = require("https");
-const fs         = require("fs");
-const path       = require("path");
 const { URL }    = require("url");
 const LeagueConfig = require("./shared-league-config");
 
@@ -113,63 +111,6 @@ function createHttpFetchFallback(maxRedirects = 5) {
   return (url, options) => requestOnce(url, options, maxRedirects);
 }
 
-
-function parseEnvBoolean(value) {
-  if (value == null) return null;
-  const normalized = String(value).trim().toLowerCase();
-  if (["1", "true", "yes", "y", "on"].indexOf(normalized) !== -1) return true;
-  if (["0", "false", "no", "n", "off"].indexOf(normalized) !== -1) return false;
-  return null;
-}
-
-function parseLocalEnvFile(filePath) {
-  const values = {};
-  let text = "";
-  try {
-    text = fs.readFileSync(filePath, "utf8");
-  } catch (error) {
-    if (error && error.code !== "ENOENT") {
-      console.warn(`⚠️ MMM-Scores could not read ${filePath}: ${error.message}`);
-    }
-    return values;
-  }
-
-  text.split(/\r?\n/).forEach((line) => {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.charAt(0) === "#") return;
-
-    const match = trimmed.match(/^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
-    if (!match) return;
-
-    let value = match[2].trim();
-    const quote = value.charAt(0);
-    if ((quote === '"' || quote === "'") && value.charAt(value.length - 1) === quote) {
-      value = value.slice(1, -1);
-    }
-    values[match[1]] = value;
-  });
-
-  return values;
-}
-
-function loadEnvConfigOverrides() {
-  const fileValues = parseLocalEnvFile(path.join(__dirname, ".env"));
-  const env = Object.assign({}, fileValues, process.env || {});
-  const overrides = {};
-
-  const display = env.MMM_SCORES_WORLDCUP_PREGAME_SCORE_DISPLAY || env.WORLDCUP_PREGAME_SCORE_DISPLAY;
-  if (display != null && String(display).trim()) {
-    overrides.worldCupPregameScoreDisplay = String(display).trim().toLowerCase();
-  }
-
-  const showAbbr = parseEnvBoolean(env.MMM_SCORES_WORLDCUP_PREGAME_SCORE_ABBR || env.WORLDCUP_PREGAME_SCORE_ABBR);
-  if (showAbbr !== null) {
-    overrides.worldCupPregameScoreDisplay = showAbbr ? "abbr" : "dash";
-  }
-
-  return overrides;
-}
-
 const fetch = (typeof global.fetch === "function")
   ? global.fetch.bind(global)
   : createHttpFetchFallback();
@@ -248,7 +189,7 @@ module.exports = NodeHelper.create({
 
   socketNotificationReceived(notification, payload) {
     if (notification === "INIT") {
-      this.config = Object.assign({}, payload || {}, loadEnvConfigOverrides());
+      this.config = payload || {};
       this.leagues = this._resolveConfiguredLeagues();
       if (!Array.isArray(this.leagues) || this.leagues.length === 0) {
         this.leagues = [this._getLeague()];
@@ -2425,10 +2366,6 @@ module.exports = NodeHelper.create({
       games: normalizedGames,
       fetchedAt: new Date().toISOString()
     };
-
-    if (normalizedLeague === "worldcup" && this.config && this.config.worldCupPregameScoreDisplay) {
-      payload.worldCupPregameScoreDisplay = this.config.worldCupPregameScoreDisplay;
-    }
 
     if (extras && typeof extras === "object") {
       Object.keys(extras).forEach((key) => {

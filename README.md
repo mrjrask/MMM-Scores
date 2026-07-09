@@ -114,7 +114,6 @@ Every option may be declared globally, as an object keyed by league (`{ mlb: val
 | `hideOlympicsAfterEnd` | `boolean` | `true` | Hide Olympic hockey scoreboards after the configured Olympic end date. |
 | `hideOlympicsFrom` | `string` | `"2026-02-24"` | ISO date when Olympic hockey scoreboards are hidden unless seasonal filtering is disabled. |
 | `showProviderStatus` | `boolean` | `false` | Shows a compact source/updated/stale-data line above the scoreboards; stale fallback data is always indicated. |
-| `worldCupPregameScoreDisplay` | `string` | `"dash"` | Controls the World Cup pregame score placeholder. Use `"dash"` for the default dash or `"abbr"` to show each team abbreviation at the game-time font size. Can also be set in the module `.env` file with `MMM_SCORES_WORLDCUP_PREGAME_SCORE_DISPLAY=abbr`. |
 | `scoreboardColumns` | `number` | auto | Columns per page. Defaults to 2 for MLB (capped at 2) and 4 for NHL/NFL/NBA/World Cup/Olympic hockey. |
 | `gamesPerColumn` (`scoreboardRows`) | `number` | auto | Games stacked in each column (4 for all leagues unless overridden). |
 | `gamesPerPage` | `number` | derived | Override the total games per page; rows adjust automatically per league. |
