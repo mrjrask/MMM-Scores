@@ -2183,7 +2183,7 @@
 
         var goals = this._firstNumber(entry.score, entry.goals, entry.team && entry.team.score);
         var shootoutScore = (league === "worldcup") ? this._extractSoccerShootoutScore(entry) : null;
-        var pregamePlaceholder = (league === "worldcup") ? this._worldCupPregameScorePlaceholder(abbr) : "—";
+        var pregamePlaceholder = (league === "worldcup") ? this._worldCupPregameScorePlaceholder(abbr) : { text: "—", className: "" };
         var metrics = [
           {
             value: goals,
