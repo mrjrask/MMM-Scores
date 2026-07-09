@@ -290,6 +290,7 @@
       hideOlympicsAfterEnd:             true,
       hideOlympicsFrom:         "2026-02-24",
       showProviderStatus:              false,
+      worldCupPregameScoreDisplay:   "dash",
 
       // Width cap so it behaves in middle_center
       maxWidth:                      "800px"
@@ -1823,6 +1824,9 @@
             if (Object.prototype.hasOwnProperty.call(metric, "superscript")) {
               superscript = metric.superscript;
             }
+            if (Object.prototype.hasOwnProperty.call(metric, "placeholderClass") && metric.placeholderClass) {
+              valueEl.classList.add(metric.placeholderClass);
+            }
             var supClass = null;
             if (Object.prototype.hasOwnProperty.call(metric, "superscriptClass")) {
               supClass = metric.superscriptClass;
@@ -2179,10 +2183,12 @@
 
         var goals = this._firstNumber(entry.score, entry.goals, entry.team && entry.team.score);
         var shootoutScore = (league === "worldcup") ? this._extractSoccerShootoutScore(entry) : null;
+        var pregamePlaceholder = (league === "worldcup") ? this._worldCupPregameScorePlaceholder(abbr) : { text: "—", className: "" };
         var metrics = [
           {
             value: goals,
-            placeholder: "—",
+            placeholder: pregamePlaceholder.text,
+            placeholderClass: pregamePlaceholder.className,
             superscript: (shootoutScore != null) ? shootoutScore : (i === 0 ? awayShots : homeShots),
             superscriptClass: (shootoutScore != null) ? "shootout-superscript" : "shots-on-goal-superscript"
           }
@@ -2210,6 +2216,26 @@
         rows: rows,
         cardClasses: cardClasses
       });
+    },
+
+    _worldCupPregameScorePlaceholder: function (abbr) {
+      var display = this.config && this.config.worldCupPregameScoreDisplay;
+      if (this.currentExtras && this.currentExtras.worldCupPregameScoreDisplay) {
+        display = this.currentExtras.worldCupPregameScoreDisplay;
+      }
+
+      display = String(display || "dash").trim().toLowerCase();
+      if ((display === "abbr" || display === "abbreviation" || display === "team") && abbr) {
+        return {
+          text: abbr,
+          className: "scoreboard-pregame-team-abbr"
+        };
+      }
+
+      return {
+        text: "—",
+        className: ""
+      };
     },
 
     _createNflGameCard: function (game) {
