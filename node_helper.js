@@ -1950,29 +1950,34 @@ module.exports = NodeHelper.create({
     return 0;
   },
 
-  _orderWorldCupFinals(events, window) {
-    if (!Array.isArray(events) || !window || window.key !== "finals") return events;
+  _worldCupEventDate(event) {
+    return this._firstDate(
+      event && event.date,
+      event && event.startDate,
+      event && event.startTimeUTC,
+      event && event.competitions && event.competitions[0] && (event.competitions[0].date || event.competitions[0].startDate || event.competitions[0].startTimeUTC)
+    );
+  },
+
+  _orderWorldCupFinalRoundEvents(events, window) {
+    if (!Array.isArray(events) || !window || !/^(quarterfinals|semifinals|finals)$/.test(window.key || "")) return events;
     return events.slice().sort((a, b) => {
-      const weightA = this._worldCupFinalsDisplayWeight(a);
-      const weightB = this._worldCupFinalsDisplayWeight(b);
-      if (weightA !== weightB) return weightA - weightB;
+      const finalA = this._isFinalGame(a);
+      const finalB = this._isFinalGame(b);
+      if (finalA !== finalB) return finalA ? 1 : -1;
 
-      const dateA = this._firstDate(
-        a && a.date,
-        a && a.startDate,
-        a && a.startTimeUTC,
-        a && a.competitions && a.competitions[0] && (a.competitions[0].date || a.competitions[0].startDate || a.competitions[0].startTimeUTC)
-      );
-      const dateB = this._firstDate(
-        b && b.date,
-        b && b.startDate,
-        b && b.startTimeUTC,
-        b && b.competitions && b.competitions[0] && (b.competitions[0].date || b.competitions[0].startDate || b.competitions[0].startTimeUTC)
-      );
-
-      if (dateA && dateB) return dateB - dateA;
+      const dateA = this._worldCupEventDate(a);
+      const dateB = this._worldCupEventDate(b);
+      if (dateA && dateB) return dateA - dateB;
       if (dateA) return -1;
       if (dateB) return 1;
+
+      if (window.key === "finals") {
+        const weightA = this._worldCupFinalsDisplayWeight(a);
+        const weightB = this._worldCupFinalsDisplayWeight(b);
+        if (weightA !== weightB) return weightA - weightB;
+      }
+
       return 0;
     });
   },
@@ -2016,7 +2021,7 @@ module.exports = NodeHelper.create({
           console.warn(`⚠️ Schedule fetch failed for ${context.todayIso}:`, scheduleError.message || scheduleError);
         }
       }
-      const roundEvents = this._orderWorldCupFinals(events, roundWindow);
+      const roundEvents = this._orderWorldCupFinalRoundEvents(events, roundWindow);
       const displayEvents = (!roundWindow && context.beforeUpdateCutoff) ? this._finalGamesOnly(roundEvents) : roundEvents;
       const extras = { scheduleGames, showingPreviousFinals: !roundWindow && context.beforeUpdateCutoff };
       if (roundWindow) {
