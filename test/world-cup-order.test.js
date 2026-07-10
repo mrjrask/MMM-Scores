@@ -25,10 +25,11 @@ function createHelper() {
   return Object.assign(Object.create(helperDefinition), { config: {} });
 }
 
-function event(id, date, state = 'pre') {
+function event(id, date, state = 'pre', name) {
   const completed = state === 'post';
   return {
     id,
+    name: name || id,
     date,
     competitions: [{ date }],
     status: {
@@ -63,4 +64,14 @@ test('World Cup finals round orders third-place and championship games by schedu
   ], { key: 'finals' });
 
   assert.deepEqual(ordered.map((game) => game.id), ['third-place', 'championship']);
+});
+
+test('World Cup completed finals keep championship above third-place game', () => {
+  const helper = createHelper();
+  const ordered = helper._orderWorldCupFinalRoundEvents([
+    event('third-place', '2026-07-18T19:00:00Z', 'post', 'Third Place'),
+    event('championship', '2026-07-19T19:00:00Z', 'post', 'Final')
+  ], { key: 'finals' });
+
+  assert.deepEqual(ordered.map((game) => game.id), ['championship', 'third-place']);
 });

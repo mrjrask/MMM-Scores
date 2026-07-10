@@ -1966,6 +1966,12 @@ module.exports = NodeHelper.create({
       const finalB = this._isFinalGame(b);
       if (finalA !== finalB) return finalA ? 1 : -1;
 
+      if (window.key === "finals" && finalA && finalB) {
+        const weightA = this._worldCupFinalsDisplayWeight(a);
+        const weightB = this._worldCupFinalsDisplayWeight(b);
+        if (weightA !== weightB) return weightA - weightB;
+      }
+
       const dateA = this._worldCupEventDate(a);
       const dateB = this._worldCupEventDate(b);
       if (dateA && dateB) return dateA - dateB;
