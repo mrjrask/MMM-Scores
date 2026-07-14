@@ -26,7 +26,7 @@ test('MLB All-Star teams render as AL and NL abbreviations', () => {
   assert.equal(moduleDefinition._abbrForTeam({ displayName: 'National League All-Stars' }, 'mlb'), 'NL');
 });
 
-test('MLB All-Star abbreviations use dedicated AL and NL logo files', () => {
+test('MLB All-Star abbreviations use existing dedicated AL and NL logo files', () => {
   const moduleDefinition = createModuleDefinition();
   const moduleInstance = Object.assign(Object.create(moduleDefinition), {
     _getLeague() {
@@ -37,6 +37,11 @@ test('MLB All-Star abbreviations use dedicated AL and NL logo files', () => {
     }
   });
 
-  assert.equal(moduleInstance.getLogoUrl('AL'), 'images/mlb/AL.png');
-  assert.equal(moduleInstance.getLogoUrl('NL'), 'images/mlb/NL.png');
+  const alLogoPath = moduleInstance.getLogoUrl('AL');
+  const nlLogoPath = moduleInstance.getLogoUrl('NL');
+
+  assert.equal(alLogoPath, 'images/mlb/AL.png');
+  assert.equal(nlLogoPath, 'images/mlb/NL.png');
+  assert.ok(fs.existsSync(path.join(__dirname, '..', alLogoPath)), `${alLogoPath} should exist`);
+  assert.ok(fs.existsSync(path.join(__dirname, '..', nlLogoPath)), `${nlLogoPath} should exist`);
 });
