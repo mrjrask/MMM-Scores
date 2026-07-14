@@ -27,6 +27,21 @@
     "vs": true
   };
 
+  var MLB_ALL_STAR_ABBREVIATIONS_BY_NAME = {
+    "al": "AL",
+    "al all-stars": "AL",
+    "al all stars": "AL",
+    "american league": "AL",
+    "american league all-stars": "AL",
+    "american league all stars": "AL",
+    "nl": "NL",
+    "nl all-stars": "NL",
+    "nl all stars": "NL",
+    "national league": "NL",
+    "national league all-stars": "NL",
+    "national league all stars": "NL"
+  };
+
   var MLB_INTERNATIONAL_ABBREVIATIONS_BY_TEAM_ID = {
     784: "CAN",
     792: "COL",
@@ -2926,11 +2941,13 @@
           || team.clubName
           || ""
         ).trim().toLowerCase();
+        var allStarAbbr = MLB_ALL_STAR_ABBREVIATIONS_BY_NAME[mlbCountryName] || "";
         var intlCountryAbbr = MLB_INTERNATIONAL_ABBREVIATIONS_BY_COUNTRY_NAME[mlbCountryName] || "";
         var intlAbbr = Number.isFinite(teamId)
           ? MLB_INTERNATIONAL_ABBREVIATIONS_BY_TEAM_ID[teamId]
           : "";
-        abbr = intlAbbr
+        abbr = allStarAbbr
+          || intlAbbr
           || intlCountryAbbr
           || MLB_ABBREVIATIONS[name]
           || team.abbreviation
