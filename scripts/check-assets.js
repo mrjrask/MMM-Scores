@@ -22,6 +22,15 @@ for (const rel of requiredPaths) {
   check(fs.existsSync(path.join(ROOT, rel)), `${rel} exists`);
 }
 
+const requiredAssets = [
+  'images/mlb/AL.png',
+  'images/mlb/NL.png'
+];
+
+for (const rel of requiredAssets) {
+  check(fs.existsSync(path.join(ROOT, rel)), `${rel} exists`);
+}
+
 const dirs = ['images/mlb', 'images/nhl', 'images/nfl', 'images/nba', 'images/oly'];
 for (const rel of dirs) {
   const dir = path.join(ROOT, rel);
