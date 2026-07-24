@@ -633,7 +633,9 @@
       var scheduleGames = (this.scheduleGamesByLeague && Array.isArray(this.scheduleGamesByLeague[league]))
         ? this.scheduleGamesByLeague[league]
         : [];
-      var schedulePages = scheduleGames.length > 0 ? 1 : 0;
+      var schedulePages = (scheduleGames.length > 0)
+        ? Math.ceil(scheduleGames.length / this._gamesPerPage)
+        : 0;
 
       var totalPages = scoreboardPages + schedulePages;
       if (totalPages === 0) totalPages = 1;
@@ -1459,9 +1461,11 @@
       if (scoreboardPages > 0 && this.currentScreen < scoreboardPages) {
         var start = this.currentScreen * this._gamesPerPage;
         pageGames = this.games.slice(start, start + this._gamesPerPage);
-      } else if (scheduleGamesForLeague.length > 0 && this.currentScreen === scoreboardPages) {
-        pageGames = scheduleGamesForLeague.slice(0, this._gamesPerPage);
-        isSchedulePage = true;
+      } else if (scheduleGamesForLeague.length > 0 && this.currentScreen >= scoreboardPages) {
+        var schedulePageIndex = this.currentScreen - scoreboardPages;
+        var scheduleStart = schedulePageIndex * this._gamesPerPage;
+        pageGames = scheduleGamesForLeague.slice(scheduleStart, scheduleStart + this._gamesPerPage);
+        isSchedulePage = pageGames.length > 0;
       }
 
       if (pageGames && pageGames.length > 0) {
