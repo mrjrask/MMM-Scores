@@ -294,15 +294,15 @@ module.exports = NodeHelper.create({
       const gamesByPk = new Map();
       const scheduleByPk = new Map();
 
-      const displayResults = await Promise.all(MLB_SCOREBOARD_SPORT_IDS.map((sportId) => this._fetchMlbGamesBySport(dateIso, sportId)));
-      displayResults.flat().forEach((game) => {
+      const displayGamesFlat = await this._fetchMlbGamesForDate(dateIso);
+      displayGamesFlat.forEach((game) => {
         const gamePk = Number(game && game.gamePk);
         if (Number.isFinite(gamePk)) gamesByPk.set(gamePk, game);
       });
 
       if (context.beforeUpdateCutoff) {
-        const scheduleResults = await Promise.all(MLB_SCOREBOARD_SPORT_IDS.map((sportId) => this._fetchMlbGamesBySport(context.todayIso, sportId)));
-        scheduleResults.flat().forEach((game) => {
+        const scheduleGamesFlat = await this._fetchMlbGamesForDate(context.todayIso);
+        scheduleGamesFlat.forEach((game) => {
           const gamePk = Number(game && game.gamePk);
           if (Number.isFinite(gamePk)) scheduleByPk.set(gamePk, game);
         });
@@ -369,6 +369,31 @@ module.exports = NodeHelper.create({
         games.push(dateBucket.games[j]);
       }
     }
+
+    return games;
+  },
+
+  // Fetches every configured MLB sportId independently so that a failure on
+  // one feed (e.g. the international/WBC sportId, which is far more prone to
+  // empty or erroring responses) never wipes out a successful fetch of the
+  // primary MLB sportId. Only a failure of the primary sportId is fatal.
+  async _fetchMlbGamesForDate(dateIso) {
+    const primarySportId = MLB_SCOREBOARD_SPORT_IDS[0];
+    const settled = await Promise.allSettled(
+      MLB_SCOREBOARD_SPORT_IDS.map((sportId) => this._fetchMlbGamesBySport(dateIso, sportId))
+    );
+
+    const games = [];
+    settled.forEach((result, index) => {
+      const sportId = MLB_SCOREBOARD_SPORT_IDS[index];
+      if (result.status === "fulfilled") {
+        games.push(...result.value);
+        return;
+      }
+
+      console.warn(`⚠️ MLB sportId=${sportId} fetch failed for ${dateIso}:`, result.reason && result.reason.message);
+      if (sportId === primarySportId) throw result.reason;
+    });
 
     return games;
   },
