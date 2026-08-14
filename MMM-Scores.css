@@ -746,3 +746,20 @@
 .scoreboard-round-label-right {
   text-align: right;
 }
+
+.schedule-title {
+  width: min(100%, var(--scoreboard-content-width, 100%));
+  text-align: center;
+}
+
+.schedule-title-left {
+  text-align: left;
+}
+
+.schedule-title-center {
+  text-align: center;
+}
+
+.schedule-title-right {
+  text-align: right;
+}

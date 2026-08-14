@@ -1471,7 +1471,8 @@
       if (pageGames && pageGames.length > 0) {
         if (isSchedulePage) {
           var scheduleTitle = document.createElement("div");
-          scheduleTitle.className = "small dimmed";
+          var scheduleAlignment = this._placementAlignment || this._detectPlacementAlignment(false) || "center";
+          scheduleTitle.className = "small dimmed schedule-title schedule-title-" + scheduleAlignment;
           scheduleTitle.innerText = "Today's Schedule";
           container.appendChild(scheduleTitle);
         }
