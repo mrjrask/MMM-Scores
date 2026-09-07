@@ -2094,8 +2094,14 @@ module.exports = NodeHelper.create({
       // and let an error reach the last-good fallback rather than publishing a
       // transient empty/partial scoreboard.
       if (results.games.length === 0 || results.failedRequests > 0) {
-        const fallbackResults = await this._fetchNflDefaultWeekGames();
-        if (fallbackResults.games.length > 0) {
+        let fallbackResults;
+        try {
+          fallbackResults = await this._fetchNflDefaultWeekGames();
+        } catch (fallbackError) {
+          if (results.failedRequests > 0) throw fallbackError;
+          console.warn("⚠️ NFL default scoreboard fetch failed; keeping complete empty date-range result:", fallbackError.message || fallbackError);
+        }
+        if (fallbackResults && fallbackResults.games.length > 0) {
           console.info("ℹ️ NFL date-range fetch was empty or incomplete; using default scoreboard feed.");
           results = fallbackResults;
         } else if (results.failedRequests > 0) {
@@ -2142,7 +2148,7 @@ module.exports = NodeHelper.create({
       this._notifyGames("nfl", games, extras);
     } catch (e) {
       console.error("🚨 NFL fetchGames failed:", e);
-      this._notifyGamesWithFallback("nfl", [], { teamsOnBye: [], errorMessage: e.message });
+      this._notifyGamesWithFallback("nfl", [], { errorMessage: e.message });
     }
   },
 

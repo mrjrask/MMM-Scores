@@ -78,9 +78,10 @@ test('NFL partial date results and an empty whole-week response reuse the last s
   const helper = createHelper();
   const cachedGame = { id: 'cached-game', date: '2026-09-06T17:00:00Z' };
   const partialGame = { id: 'partial-game', date: '2026-09-03T17:00:00Z' };
+  const cachedBye = { abbreviation: 'KC', displayName: 'Kansas City Chiefs' };
 
-  helper._fetchJson = async (url) => url.includes('dates=20260906') ? { events: [cachedGame] } : { events: [] };
-  await helper._fetchNflGames();
+  helper._notifyGames('nfl', [cachedGame], { teamsOnBye: [cachedBye] });
+  helper.sent = [];
 
   helper._fetchJson = async (url) => {
     if (!url.includes('dates=')) return { events: [] };
@@ -89,9 +90,29 @@ test('NFL partial date results and an empty whole-week response reuse the last s
   };
   await helper._fetchNflGames();
 
-  assert.equal(helper.sent.length, 2);
-  assert.deepEqual(helper.sent[1].payload.games, [cachedGame]);
-  assert.equal(helper.sent[1].payload.isStale, true);
-  assert.equal(helper.sent[1].payload.fallbackUsed, true);
-  assert.match(helper.sent[1].payload.staleReason, /scoreboard feeds were incomplete/);
+  assert.equal(helper.sent.length, 1);
+  assert.deepEqual(helper.sent[0].payload.games, [cachedGame]);
+  assert.deepEqual(helper.sent[0].payload.teamsOnBye, [cachedBye]);
+  assert.equal(helper.sent[0].payload.isStale, true);
+  assert.equal(helper.sent[0].payload.fallbackUsed, true);
+  assert.match(helper.sent[0].payload.staleReason, /scoreboard feeds were incomplete/);
+});
+
+test('NFL complete empty date results survive a default scoreboard failure', async () => {
+  const helper = createHelper();
+  let defaultFetches = 0;
+
+  helper._fetchJson = async (url) => {
+    if (url.includes('dates=')) return { events: [] };
+    defaultFetches += 1;
+    throw new Error('default scoreboard unavailable');
+  };
+
+  await helper._fetchNflGames();
+
+  assert.equal(defaultFetches, 1);
+  assert.equal(helper.sent.length, 1);
+  assert.deepEqual(helper.sent[0].payload.games, []);
+  assert.equal(helper.sent[0].payload.errorMessage, undefined);
+  assert.equal(helper.sent[0].payload.isStale, undefined);
 });
