@@ -2095,9 +2095,11 @@ module.exports = NodeHelper.create({
       // transient empty/partial scoreboard.
       if (results.games.length === 0 || results.failedRequests > 0) {
         const fallbackResults = await this._fetchNflDefaultWeekGames();
-        if (fallbackResults.games.length > 0 || results.failedRequests > 0) {
+        if (fallbackResults.games.length > 0) {
           console.info("ℹ️ NFL date-range fetch was empty or incomplete; using default scoreboard feed.");
           results = fallbackResults;
+        } else if (results.failedRequests > 0) {
+          throw new Error("NFL scoreboard feeds were incomplete");
         }
       }
 

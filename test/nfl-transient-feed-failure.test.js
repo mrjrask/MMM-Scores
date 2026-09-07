@@ -73,3 +73,25 @@ test('NFL partial date results are replaced by a successful whole-week response'
   assert.deepEqual(helper.sent[0].payload.games, completeGames);
   assert.equal(helper.sent[0].payload.isStale, undefined);
 });
+
+test('NFL partial date results and an empty whole-week response reuse the last scoreboard', async () => {
+  const helper = createHelper();
+  const cachedGame = { id: 'cached-game', date: '2026-09-06T17:00:00Z' };
+  const partialGame = { id: 'partial-game', date: '2026-09-03T17:00:00Z' };
+
+  helper._fetchJson = async (url) => url.includes('dates=20260906') ? { events: [cachedGame] } : { events: [] };
+  await helper._fetchNflGames();
+
+  helper._fetchJson = async (url) => {
+    if (!url.includes('dates=')) return { events: [] };
+    if (url.includes('dates=20260904')) throw new Error('one date failed');
+    return url.includes('dates=20260903') ? { events: [partialGame] } : { events: [] };
+  };
+  await helper._fetchNflGames();
+
+  assert.equal(helper.sent.length, 2);
+  assert.deepEqual(helper.sent[1].payload.games, [cachedGame]);
+  assert.equal(helper.sent[1].payload.isStale, true);
+  assert.equal(helper.sent[1].payload.fallbackUsed, true);
+  assert.match(helper.sent[1].payload.staleReason, /scoreboard feeds were incomplete/);
+});
