@@ -2073,6 +2073,9 @@ module.exports = NodeHelper.create({
       if (context.beforeUpdateCutoff) {
         const previousResults = await this._fetchNflWeekGames([context.previousDateIso]);
         const todayResults = await this._fetchNflWeekGames([context.todayIso]);
+        if (previousResults.failedRequests > 0 || todayResults.failedRequests > 0) {
+          throw new Error("NFL scoreboard date fetch was incomplete");
+        }
         const games = this._finalGamesOnly(previousResults.games);
         console.log(`🏈 Sending ${games.length} NFL final games for ${context.previousDateIso} plus ${todayResults.games.length} scheduled games for ${context.todayIso}.`);
         this._notifyGames("nfl", games, {
@@ -2086,10 +2089,14 @@ module.exports = NodeHelper.create({
       const weekRange = this._getNflWeekDateRange();
       let results = await this._fetchNflWeekGames(weekRange.dateIsos);
 
-      if (results.games.length === 0) {
+      // A rejected date request makes the aggregate incomplete even when some
+      // other dates succeeded. Prefer ESPN's whole-week response in that case,
+      // and let an error reach the last-good fallback rather than publishing a
+      // transient empty/partial scoreboard.
+      if (results.games.length === 0 || results.failedRequests > 0) {
         const fallbackResults = await this._fetchNflDefaultWeekGames();
-        if (fallbackResults.games.length > 0) {
-          console.info("ℹ️ NFL date-range fetch returned no games; using default scoreboard feed.");
+        if (fallbackResults.games.length > 0 || results.failedRequests > 0) {
+          console.info("ℹ️ NFL date-range fetch was empty or incomplete; using default scoreboard feed.");
           results = fallbackResults;
         }
       }
@@ -2097,6 +2104,9 @@ module.exports = NodeHelper.create({
       if (this._shouldAdvanceNflPlayoffWeek(results.games)) {
         const nextWeekRange = this._getNflWeekDateRange(1);
         results = await this._fetchNflWeekGames(nextWeekRange.dateIsos);
+        if (results.failedRequests > 0) {
+          throw new Error("NFL next-week scoreboard date fetch was incomplete");
+        }
         results.range = nextWeekRange;
       }
 
@@ -2144,15 +2154,22 @@ module.exports = NodeHelper.create({
       return { dateIso, json: await this._fetchJson(url, {}, `NFL scoreboard ${dateIso}`) };
     }));
 
+    let successfulRequests = 0;
+    let failedRequests = 0;
     results.forEach((result) => {
       if (result.status === "fulfilled") {
+        successfulRequests += 1;
         this._mergeNflScoreboardResponse(result.value.json, aggregated, byeTeams, result.value.dateIso);
       } else {
+        failedRequests += 1;
         console.error("🚨 NFL fetchGames failed for one date:", result.reason);
       }
     });
 
-    return this._finalizeNflWeekResults(aggregated, byeTeams);
+    return Object.assign(this._finalizeNflWeekResults(aggregated, byeTeams), {
+      successfulRequests,
+      failedRequests
+    });
   },
 
   async _fetchNflDefaultWeekGames() {
@@ -2160,12 +2177,8 @@ module.exports = NodeHelper.create({
     const byeTeams = new Map();
     const url = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard";
 
-    try {
-      const json = await this._fetchJson(url, {}, "NFL default scoreboard");
-      this._mergeNflScoreboardResponse(json, aggregated, byeTeams, "current");
-    } catch (err) {
-      console.error("🚨 NFL fallback scoreboard fetch failed:", err);
-    }
+    const json = await this._fetchJson(url, {}, "NFL default scoreboard");
+    this._mergeNflScoreboardResponse(json, aggregated, byeTeams, "current");
 
     return this._finalizeNflWeekResults(aggregated, byeTeams);
   },
