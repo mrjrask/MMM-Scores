@@ -2613,7 +2613,7 @@ module.exports = NodeHelper.create({
   _nflWeekStartForDate(dateIso) {
     const localMidnight = new Date(`${dateIso}T00:00:00Z`);
     const dayOfWeek = localMidnight.getUTCDay();
-    const offset = (dayOfWeek - 4 + 7) % 7; // 4 === Thursday
+    const offset = (dayOfWeek - 3 + 7) % 7; // 3 === Wednesday
     const weekStart = new Date(localMidnight);
     weekStart.setUTCDate(weekStart.getUTCDate() - offset);
     return weekStart;
@@ -2622,7 +2622,10 @@ module.exports = NodeHelper.create({
   _nflWeekDatesFromStart(weekStart) {
     const dateIsos = [];
     const cursor = new Date(weekStart);
-    for (let i = 0; i < 5; i += 1) {
+    // ESPN occasionally assigns an early international or special-event game
+    // to Wednesday. Fetch the entire NFL scoreboard window through Monday so
+    // those games cannot fall just outside the weekly aggregate.
+    for (let i = 0; i < 6; i += 1) {
       dateIsos.push(cursor.toISOString().slice(0, 10));
       cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
@@ -2631,8 +2634,11 @@ module.exports = NodeHelper.create({
 
   _nflRegularWeekStart(dateIso, dayOfWeek, minutes) {
     const weekStart = this._nflWeekStartForDate(dateIso);
-    if (dayOfWeek === 3 && minutes >= (9 * 60)) {
-      weekStart.setUTCDate(weekStart.getUTCDate() + 7);
+    // Keep the completed week visible through Wednesday morning, then roll to
+    // the window beginning that Wednesday. This preserves the existing 09:00
+    // weekly rollover while expanding the fetched range by one day.
+    if (dayOfWeek === 3 && minutes < (9 * 60)) {
+      weekStart.setUTCDate(weekStart.getUTCDate() - 7);
     }
     return weekStart;
   },
