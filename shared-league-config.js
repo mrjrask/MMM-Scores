@@ -6,10 +6,17 @@
 
   var SUPPORTED_LEAGUES = ["mlb", "wbc", "nhl", "nfl", "nba", "worldcup", "olympic_mhockey", "olympic_whockey"];
 
+  // Playoff bracket screens are opt-in: they are valid league tokens (so they can be
+  // listed explicitly in `league`/`leagues`), but are intentionally excluded from the
+  // "all" expansion below so off-season users don't get an empty/projected bracket
+  // screen added to their rotation without asking for it.
+  var PLAYOFF_LEAGUES = ["mlb_playoffs", "nhl_playoffs", "nba_playoffs"];
+  var ALL_LEAGUE_TOKENS = SUPPORTED_LEAGUES.concat(PLAYOFF_LEAGUES);
+
   function normalizeLeagueKey(value) {
     if (value == null) return null;
     var str = String(value).trim().toLowerCase();
-    return SUPPORTED_LEAGUES.indexOf(str) !== -1 ? str : null;
+    return ALL_LEAGUE_TOKENS.indexOf(str) !== -1 ? str : null;
   }
 
   function coerceLeagueArray(input) {

@@ -6,6 +6,9 @@ const http       = require("http");
 const https      = require("https");
 const { URL }    = require("url");
 const LeagueConfig = require("./shared-league-config");
+const MlbPlayoffData = require("./playoff-data-mlb");
+const NhlPlayoffData = require("./playoff-data-nhl");
+const NbaPlayoffData = require("./playoff-data-nba");
 
 function createHttpFetchFallback(maxRedirects = 5) {
   const createAbortError = () => {
@@ -284,7 +287,75 @@ module.exports = NodeHelper.create({
     if (league === "nfl") return this._fetchNflGames();
     if (league === "nba") return this._fetchNbaGames();
     if (league === "worldcup") return this._fetchWorldCupGames();
+    if (league === "mlb_playoffs") return this._fetchMlbPlayoffs();
+    if (league === "nhl_playoffs") return this._fetchNhlPlayoffsScreen();
+    if (league === "nba_playoffs") return this._fetchNbaPlayoffsScreen();
     return this._fetchMlbGames();
+  },
+
+  // ----------------- Playoff bracket screens -----------------
+  //
+  // Each league's data module (playoff-data-{mlb,nhl,nba}.js) fetches and
+  // normalizes that league's postseason feed (spec: playoff screens spec,
+  // §3-4). Here we just cache the result in memory (120s, or 30s while any
+  // series is live, per spec §2) and hand it to the front end as `extras`
+  // on the existing GAMES notification, with an empty `games` array since
+  // there's no per-game list to paginate for a bracket screen.
+
+  _hasLivePlayoffSeries(data) {
+    return !!(data && Array.isArray(data.series) && data.series.some((s) => s && s.live));
+  },
+
+  async _getCachedPlayoffData(league, fetchFn) {
+    if (!this._playoffCache) this._playoffCache = {};
+    const cached = this._playoffCache[league];
+    const now = Date.now();
+    if (cached) {
+      const ttlMs = this._hasLivePlayoffSeries(cached.data) ? 30 * 1000 : 120 * 1000;
+      if (now - cached.fetchedAt < ttlMs) return cached.data;
+    }
+    const data = await fetchFn();
+    this._playoffCache[league] = { data, fetchedAt: now };
+    return data;
+  },
+
+  async _fetchMlbPlayoffs() {
+    try {
+      const data = await this._getCachedPlayoffData(
+        "mlb_playoffs",
+        () => MlbPlayoffData.fetchMlbPostseason({ fetchJson: this._fetchJson.bind(this) })
+      );
+      this._notifyGames("mlb_playoffs", [], { playoffs: data });
+    } catch (e) {
+      console.error("🚨 MLB playoffs fetch failed:", e);
+      this._notifyGamesWithFallback("mlb_playoffs", [], { errorMessage: e.message });
+    }
+  },
+
+  async _fetchNhlPlayoffsScreen() {
+    try {
+      const data = await this._getCachedPlayoffData(
+        "nhl_playoffs",
+        () => NhlPlayoffData.fetchNhlPlayoffs({ fetchJson: this._fetchJson.bind(this) })
+      );
+      this._notifyGames("nhl_playoffs", [], { playoffs: data });
+    } catch (e) {
+      console.error("🚨 NHL playoffs fetch failed:", e);
+      this._notifyGamesWithFallback("nhl_playoffs", [], { errorMessage: e.message });
+    }
+  },
+
+  async _fetchNbaPlayoffsScreen() {
+    try {
+      const data = await this._getCachedPlayoffData(
+        "nba_playoffs",
+        () => NbaPlayoffData.fetchNbaPlayoffs({ fetchJson: this._fetchJson.bind(this) })
+      );
+      this._notifyGames("nba_playoffs", [], { playoffs: data });
+    } catch (e) {
+      console.error("🚨 NBA playoffs fetch failed:", e);
+      this._notifyGamesWithFallback("nba_playoffs", [], { errorMessage: e.message });
+    }
   },
 
   async _fetchMlbGames() {
