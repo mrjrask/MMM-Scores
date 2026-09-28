@@ -1,0 +1,356 @@
+/* playoff-bracket.css
+ *
+ * Styling for the MLB/NHL/NBA Playoffs bracket screens. Colors and sizing
+ * follow the desk_display playoff screens spec (section 1 "colours" table
+ * and section 7 "layout and drawing"), reimplemented with CSS instead of a
+ * fixed-size raster image so it stays responsive inside a MagicMirror
+ * region.
+ *
+ * `--row-h` is the one true unit: every bracket slot position is expressed
+ * as a multiple of it (see playoff-bracket-shared.js's *ColumnTopsUnits()
+ * helpers), and it scales with the module's existing --box-scale variable
+ * the same way the scoreboard screens do.
+ */
+
+:root {
+  --playoff-row-h-base: 18px;
+  --row-h: calc(var(--playoff-row-h-base) * var(--box-scale));
+
+  --playoff-bg: #000000;
+  --playoff-text: #ffffff;
+  --playoff-dim: #787878;
+  --playoff-label: #aaaaaa;
+  --playoff-slot-fill: #161616;
+  --playoff-slot-outline: #464646;
+  --playoff-connector: #5a5a5a;
+  --playoff-separator: #2d2d2d;
+  --playoff-win: #00c800;
+  --playoff-live: #ffd242;
+
+  --playoff-line-w: calc(var(--box-scale) * 1.5px);
+  --playoff-slot-inset: calc(var(--box-scale) * 3px);
+}
+
+.playoff-screen {
+  container-type: inline-size;
+  container-name: playoff-screen;
+  color: var(--playoff-text);
+  font-family: var(--scoreboard-font-family);
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--row-h) * 0.45);
+  padding-bottom: 12px;
+}
+
+/*--------------------------------------------------
+  Header: league logo + title (spec §7.1)
+--------------------------------------------------*/
+.playoff-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--box-scale) * 4px);
+}
+
+.playoff-header-logo {
+  width: calc(var(--box-scale) * 26px);
+  height: calc(var(--box-scale) * 26px);
+  object-fit: contain;
+}
+
+.playoff-header-title {
+  font-size: calc(var(--box-scale) * 30px);
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
+.playoff-no-data {
+  text-align: center;
+  color: var(--playoff-dim);
+  font-size: calc(var(--box-scale) * 18px);
+  padding: calc(var(--row-h)) 0;
+}
+
+/*--------------------------------------------------
+  Bracket (spec §7.2)
+--------------------------------------------------*/
+.playoff-bracket {
+  position: relative;
+  width: 100%;
+}
+
+/* Narrow regions drop the bracket and show only the header + series list
+   (spec §1 point 4). */
+@container playoff-screen (max-width: 199px) {
+  .playoff-bracket {
+    display: none;
+  }
+}
+
+.playoff-bracket-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.playoff-bracket-columns {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 1;
+}
+
+.playoff-col {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.playoff-col-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--playoff-label);
+  font-size: calc(var(--row-h) * 0.62);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playoff-col-body {
+  position: relative;
+  width: 100%;
+}
+
+.playoff-slot {
+  position: absolute;
+  left: var(--playoff-slot-inset);
+  right: var(--playoff-slot-inset);
+  display: flex;
+  flex-direction: column;
+  background: var(--playoff-slot-fill);
+  border: var(--playoff-line-w) solid var(--playoff-slot-outline);
+  border-radius: calc(var(--row-h) * 0.16);
+  overflow: hidden;
+  box-sizing: border-box;
+  z-index: 2;
+}
+
+.playoff-slot-row {
+  flex: 1 1 50%;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--box-scale) * 3px);
+  padding: 0 calc(var(--box-scale) * 3px);
+  min-width: 0;
+}
+
+.playoff-slot-divider {
+  height: var(--playoff-line-w);
+  background: var(--playoff-slot-outline);
+  flex: 0 0 auto;
+}
+
+.playoff-seed {
+  color: var(--playoff-dim);
+  font-size: calc(var(--row-h) * 0.42);
+  flex: 0 0 auto;
+}
+
+.playoff-slot-logo,
+.playoff-series-logo,
+.playoff-marker-logo {
+  object-fit: contain;
+}
+
+.playoff-slot-logo {
+  height: calc(var(--row-h) * 0.8);
+  width: calc(var(--row-h) * 0.8);
+  flex: 0 0 auto;
+}
+
+.playoff-slot-code {
+  font-size: calc(var(--row-h) * 0.5);
+  flex: 0 0 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.playoff-slot-wins {
+  margin-left: auto;
+  font-size: calc(var(--row-h) * 0.66);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.playoff-slot-wins.playoff-live,
+.playoff-series-wins.playoff-live {
+  color: var(--playoff-live);
+}
+
+.playoff-tbd {
+  color: var(--playoff-dim);
+  font-size: calc(var(--row-h) * 0.5);
+  margin: 0 auto;
+}
+
+.playoff-dim {
+  color: var(--playoff-dim);
+}
+
+.playoff-dim-logo {
+  opacity: 0.35;
+}
+
+/*--------------------------------------------------
+  Connectors (spec §7.2 "Connectors")
+--------------------------------------------------*/
+.playoff-connectors {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.playoff-connector {
+  position: absolute;
+  background: var(--playoff-connector);
+}
+
+.playoff-connector-h {
+  height: var(--playoff-line-w);
+}
+
+.playoff-connector-v {
+  width: var(--playoff-line-w);
+}
+
+/*--------------------------------------------------
+  Side / champion markers (spec §7.2 "Side markers")
+--------------------------------------------------*/
+.playoff-marker {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.playoff-marker-logo {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.playoff-marker-label {
+  color: var(--playoff-label);
+  font-size: calc(var(--row-h) * 0.6);
+  letter-spacing: 0.08em;
+}
+
+/*--------------------------------------------------
+  Series list (spec §7.3)
+--------------------------------------------------*/
+.playoff-series-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0 calc(var(--box-scale) * 6px);
+}
+
+.playoff-series-heading {
+  color: var(--playoff-label);
+  text-align: center;
+  font-size: calc(var(--box-scale) * 20px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: calc(var(--box-scale) * 4px) 0;
+}
+
+.playoff-series-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--box-scale) * 4px);
+  padding: calc(var(--box-scale) * 5px) 0;
+}
+
+.playoff-series-sep {
+  height: var(--playoff-line-w);
+  background: var(--playoff-separator);
+  width: 100%;
+}
+
+.playoff-series-teams {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  width: 100%;
+  max-width: 640px;
+  gap: calc(var(--box-scale) * 6px);
+}
+
+.playoff-series-team {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--box-scale) * 6px);
+  min-width: 0;
+}
+
+.playoff-series-team-top {
+  justify-content: flex-end;
+}
+
+.playoff-series-team-bottom {
+  justify-content: flex-start;
+}
+
+.playoff-series-logo {
+  height: calc(var(--box-scale) * 44px);
+  width: calc(var(--box-scale) * 44px);
+  flex: 0 0 auto;
+}
+
+.playoff-series-code {
+  font-size: calc(var(--box-scale) * 28px);
+  flex: 0 0 auto;
+}
+
+.playoff-series-wins {
+  font-size: calc(var(--box-scale) * 36px);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.playoff-series-dash {
+  color: var(--playoff-dim);
+  font-size: calc(var(--box-scale) * 20px);
+  text-align: center;
+}
+
+.playoff-series-status {
+  font-size: calc(var(--box-scale) * 20px);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.playoff-status-dim {
+  color: var(--playoff-dim);
+}
+
+.playoff-status-win {
+  color: var(--playoff-win);
+}
+
+.playoff-status-live {
+  color: var(--playoff-live);
+}
+
+.playoff-status-normal {
+  color: var(--playoff-text);
+}

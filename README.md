@@ -13,6 +13,7 @@ A MagicMirror² module that cycles through MLB, NHL, NFL, NBA, World Cup soccer,
   - [Layout controls](#layout-controls)
   - [League rotation](#league-rotation)
   - [Highlighting](#highlighting)
+- [Playoff Bracket Screens](#playoff-bracket-screens)
 - [Assets & Styling](#assets--styling)
 - [Data Sources](#data-sources)
 - [Troubleshooting](#troubleshooting)
@@ -22,6 +23,7 @@ A MagicMirror² module that cycles through MLB, NHL, NFL, NBA, World Cup soccer,
 
 ## Features
 - **Eight-league scoreboards**: MLB (R/H/E linescore), WBC, NHL (goals & shots), NFL (quarter-by-quarter totals plus bye list), NBA (quarter/OT breakdown), World Cup soccer (half/extra-time clocks, stoppage time, and shootout indicators), Men's Olympic Hockey, and Women's Olympic Hockey.
+- **MLB/NHL/NBA Playoff Bracket screens**: A full postseason bracket (Wild Card/Division Series/LCS/World Series for MLB; First Round through the Finals for NHL/NBA) plus a scrollable current-round series list with live status, next-game times, and series scores. See [Playoff Bracket Screens](#playoff-bracket-screens).
 - **Automatic league rotation**: Show a single league, a custom sequence, or all supported leagues with timed page flips.
 - **Flexible layout**: Control columns, rows, or total games per page per league and scale everything with a single `layoutScale` value.
 - **Favorite team highlighting**: Per-league highlight lists add a subtle accent to matching teams on scoreboards.
@@ -101,7 +103,7 @@ Every option may be declared globally, as an object keyed by league (`{ mlb: val
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `league` / `leagues` | `string \| string[]` | `"mlb"` | League(s) to display. Accepts `"mlb"`, `"wbc"`, `"nhl"`, `"nfl"`, `"nba"`, `"worldcup"`, `"olympic_mhockey"`, `"olympic_whockey"`, or `"all"`. Arrays define the rotation order. |
+| `league` / `leagues` | `string \| string[]` | `"mlb"` | League(s) to display. Accepts `"mlb"`, `"wbc"`, `"nhl"`, `"nfl"`, `"nba"`, `"worldcup"`, `"olympic_mhockey"`, `"olympic_whockey"`, `"mlb_playoffs"`, `"nhl_playoffs"`, `"nba_playoffs"`, or `"all"`. Arrays define the rotation order. The three `*_playoffs` screens are **not** included in `"all"` — add them explicitly (see [Playoff Bracket Screens](#playoff-bracket-screens)). |
 | `updateIntervalScores` | `number` | `60000` | Milliseconds between helper fetches. Minimum enforced interval is 10 seconds. |
 | `rotateIntervalScores` | `number` | `15000` | Milliseconds between scoreboard page rotations. |
 | `timeZone` | `string` | `"America/Chicago"` | Time zone used to decide the scoreboard date. Before the configured daily update cutoff (09:30 local for most leagues, 03:00 for Olympic hockey), scoreboards show previous-day final scores and then rotate to a current-day schedule screen; after the cutoff they show the current day's scoreboard. |
@@ -156,11 +158,45 @@ Olympic hockey country mapping uses IOC-style 3-letter codes (`CAN`, `USA`, `FIN
 
 ---
 
+## Playoff Bracket Screens
+Three additional screens show a full postseason bracket instead of a day's scoreboard: `mlb_playoffs`, `nhl_playoffs`, and `nba_playoffs`. Each one draws:
+
+1. A header with the league's postseason logo and title (e.g. "MLB Playoffs").
+2. A seven-column bracket (`WC · DS · LCS · WS · LCS · DS · WC` for MLB; `R1 · R2 · CF · SCF/Finals · CF · R2 · R1` for NHL/NBA), with the AL/West on the left and the NL/East on the right. Decided series dim the loser, live series turn both scores yellow, and undecided future rounds show the matchup already known from seeding with no scores ("TBD" when a team isn't known yet).
+3. A single-column list of every series in the **current round** (the earliest round with an unfinished series, or the last round once everything is decided), each with a status line ("Game 2 · Tonight 7 PM", "Royals win 2-0", "Series tied 1-1", etc).
+4. On narrow MagicMirror regions (under ~200px wide) the bracket is dropped automatically and only the header and series list show.
+
+Add one or more to your rotation like any other league:
+```js
+{
+  module: "MMM-Scores",
+  position: "middle_center",
+  config: {
+    league: ["mlb_playoffs", "nhl_playoffs", "nba_playoffs"],
+    rotateIntervalScores: 20 * 1000,
+    maxWidth: "800px"
+  }
+}
+```
+
+Notes:
+- Before a league's postseason bracket exists, the screen shows a **projected** bracket built from regular-season standings/seeding (heading reads "Projected Wild Card Series" / "Projected First Round"), so the screen is never blank during the stretch run.
+- Each playoff feed is cached in the helper for 120 seconds, or 30 seconds while any series has a live game, independent of `updateIntervalScores`.
+- If a league has no postseason data at all (offseason with no cached standings yet), the screen shows just the header and a centered "No postseason data" message.
+- The bracket geometry scales with `layoutScale` the same way scoreboard cards do.
+
+---
+
 ## Assets & Styling
 ```
 MMM-Scores/
 ├─ MMM-Scores.js
 ├─ MMM-Scores.css
+├─ playoff-bracket.css
+├─ playoff-bracket-shared.js
+├─ playoff-data-mlb.js
+├─ playoff-data-nhl.js
+├─ playoff-data-nba.js
 ├─ node_helper.js
 ├─ fonts/
 │  └─ TimesSquare-m105.ttf
@@ -202,6 +238,9 @@ Scoreboard data comes from league-specific feeds with fallbacks where needed.
 - **NFL scores**: Weekly schedules from `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=<YYYYMMDD>` aggregated from Wednesday through Monday night; includes bye-week teams.
 - **Men's Olympic hockey scores**: Primary `https://site.api.espn.com/apis/site/v2/sports/hockey/mens-olympics/scoreboard?dates=<YYYYMMDD>` with resilient provider-chain hooks (`olympics.com`, IIHF, TheSportsDB, Wikipedia/Wikidata finals) and last-good-data fallback.
 - **Women's Olympic hockey scores**: Primary `https://site.api.espn.com/apis/site/v2/sports/hockey/womens-olympics/scoreboard?dates=<YYYYMMDD>` with the same provider-chain/fallback architecture.
+- **MLB playoff bracket**: `statsapi.mlb.com` schedule/postseason-series endpoints for the bracket, plus the regular-season standings endpoint for wild-card-era seeding (falls back to a seed-projected bracket before the postseason schedule exists).
+- **NHL playoff bracket**: `api-web.nhle.com`'s `playoff-bracket` and `schedule/now` endpoints, with a standings-based first-round projection and a last-season bracket fallback in the offseason.
+- **NBA playoff bracket**: the NBA's live-data CDN bracket JSON (`cdn.nba.com`, with an S3 mirror fallback), which also keeps last season's completed bracket visible in the offseason.
 
 ---
 
@@ -211,6 +250,8 @@ Scoreboard data comes from league-specific feeds with fallbacks where needed.
 - **Logos missing**: Ensure filenames exactly match the abbreviations used in game data (case-sensitive per league). Missing files fall back to text labels.
 - **"Cannot find module 'node-fetch'"**: Upgrade to Node.js 18+; the helper relies on the built-in `fetch`.
 - **CSS 404s for `/css/custom.css`**: Only reference `css/custom.css` if the file exists to avoid MIME errors.
+- **Playoff screen always shows "Projected"**: That's expected once regular-season standings exist but the postseason schedule hasn't been published yet (or, for NHL/NBA, once the previous postseason has fully wrapped and next year's bracket isn't up yet). It switches to the real bracket automatically once the provider publishes it.
+- **Playoff screen shows "No postseason data"**: The helper couldn't reach any of that league's data sources (live bracket, standings-based projection, or previous-season fallback). Check `npm run test:api`-style connectivity to the hosts listed in [Data Sources](#data-sources).
 
 ---
 

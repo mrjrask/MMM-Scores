@@ -272,6 +272,8 @@
   var EXTENDED_LAYOUT_LEAGUES = { nfl: true, nhl: true, nba: true, worldcup: true, olympic_mhockey: true, olympic_whockey: true };
 
   var SUPPORTED_LEAGUES = ["mlb", "wbc", "nhl", "nfl", "nba", "worldcup", "olympic_mhockey", "olympic_whockey"];
+  var PLAYOFF_LEAGUES = ["mlb_playoffs", "nhl_playoffs", "nba_playoffs"];
+  var ALL_LEAGUE_TOKENS = SUPPORTED_LEAGUES.concat(PLAYOFF_LEAGUES);
   var MLB_MAX_GAMES_PER_PAGE = 8;
   var MLB_MAX_COLUMNS        = 2;
 
@@ -321,17 +323,18 @@
       if (league === "worldcup") return "World Cup Scoreboard";
       if (league === "olympic_mhockey") return "Men's Olympic Hockey Scoreboard";
       if (league === "olympic_whockey") return "Women's Olympic Hockey Scoreboard";
+      if (this._isPlayoffLeague(league)) return null; // the screen draws its own logo + title
       return "Scoreboard";
     },
 
     getScripts: function () {
       // MagicMirror already provides moment-timezone globally; avoid loading our own copy to
       // prevent clobbering other modules (e.g., the Calendar module relies on moment.tz).
-      return ["shared-league-config.js"];
+      return ["shared-league-config.js", "playoff-bracket-shared.js"];
     },
 
     getStyles: function () {
-      return ["MMM-Scores.css"];
+      return ["MMM-Scores.css", "playoff-bracket.css"];
     },
 
     start: function () {
@@ -422,7 +425,11 @@
       if (shared) return shared.normalizeLeagueKey(value);
       if (value == null) return null;
       var str = String(value).trim().toLowerCase();
-      return SUPPORTED_LEAGUES.indexOf(str) !== -1 ? str : null;
+      return ALL_LEAGUE_TOKENS.indexOf(str) !== -1 ? str : null;
+    },
+
+    _isPlayoffLeague: function (league) {
+      return PLAYOFF_LEAGUES.indexOf(league) !== -1;
     },
 
     _coerceLeagueArray: function (input) {
@@ -439,7 +446,7 @@
       for (var k = 0; k < tokens.length; k++) {
         var lower = String(tokens[k]).toLowerCase();
         if (lower === "all") return SUPPORTED_LEAGUES.slice();
-        if (SUPPORTED_LEAGUES.indexOf(lower) !== -1 && !seen[lower]) { out.push(lower); seen[lower] = true; }
+        if (ALL_LEAGUE_TOKENS.indexOf(lower) !== -1 && !seen[lower]) { out.push(lower); seen[lower] = true; }
       }
       return out;
     },
@@ -1372,6 +1379,19 @@
         return this._noData("Loading games...");
       }
       var activeLeagueForData = this._getLeague();
+
+      if (this._isPlayoffLeague(activeLeagueForData)) {
+        this._setModuleContentWidth(null);
+        try {
+          wrapper.appendChild(this._buildPlayoffScreen(activeLeagueForData));
+        } catch (e) {
+          console.error("MMM-Scores: getDom playoff build error", e);
+          return this._noData("Error building view.");
+        }
+        this._lastRenderedDom = wrapper;
+        return wrapper;
+      }
+
       var activeScheduleGames = (this.scheduleGamesByLeague && Array.isArray(this.scheduleGamesByLeague[activeLeagueForData]))
         ? this.scheduleGamesByLeague[activeLeagueForData]
         : [];
@@ -3078,6 +3098,462 @@
       }
 
       return false;
+    },
+
+    // ----------------- PLAYOFF BRACKET SCREENS -----------------
+
+    _playoffBracketLib: function () {
+      return (typeof window !== "undefined" && window.MmmScoresPlayoffBracket) ? window.MmmScoresPlayoffBracket : null;
+    },
+
+    _playoffSportForLeague: function (league) {
+      return String(league || "").replace(/_playoffs$/, "");
+    },
+
+    _playoffLogoUrl: function (sport, code) {
+      if (!code) return null;
+      var folder = (sport === "nhl" || sport === "nba") ? sport : "mlb";
+      return this.file("images/" + folder + "/" + String(code).toUpperCase() + ".png");
+    },
+
+    _playoffTeamName: function (bracket, code) {
+      if (!code) return "";
+      var names = (bracket && bracket.names) || {};
+      return names[code] || code;
+    },
+
+    _playoffSeedLabel: function (bracket, code) {
+      if (!code || !bracket || !bracket.seeds) return null;
+      var seed = bracket.seeds[code];
+      return (seed == null || seed === "") ? null : String(seed);
+    },
+
+    _buildPlayoffScreen: function (league) {
+      var sport = this._playoffSportForLeague(league);
+      var wrapper = document.createElement("div");
+      wrapper.className = "playoff-screen playoff-screen-" + sport;
+
+      wrapper.appendChild(this._buildPlayoffHeader(sport));
+
+      var data = this.currentExtras && this.currentExtras.playoffs;
+      var Lib = this._playoffBracketLib();
+
+      if (!data || !Array.isArray(data.series) || !Lib) {
+        var noData = document.createElement("div");
+        noData.className = "playoff-no-data";
+        noData.innerText = "No postseason data";
+        wrapper.appendChild(noData);
+        return wrapper;
+      }
+
+      var view;
+      try {
+        view = Lib.buildPlayoffView(sport, data);
+      } catch (e) {
+        console.error("MMM-Scores: playoff bracket build error", e);
+        var errEl = document.createElement("div");
+        errEl.className = "playoff-no-data";
+        errEl.innerText = "No postseason data";
+        wrapper.appendChild(errEl);
+        return wrapper;
+      }
+
+      wrapper.appendChild(this._buildPlayoffBracket(Lib, sport, view.bracket));
+      wrapper.appendChild(this._buildPlayoffSeriesList(Lib, sport, view));
+
+      return wrapper;
+    },
+
+    _buildPlayoffHeader: function (sport) {
+      var header = document.createElement("div");
+      header.className = "playoff-header";
+
+      var logoPath = sport === "mlb" ? "images/mlb/MLB.png"
+        : sport === "nhl" ? "images/nhl/SCP.png"
+        : "images/nba/NBA.png";
+      var logo = document.createElement("img");
+      logo.className = "playoff-header-logo";
+      logo.src = this.file(logoPath);
+      header.appendChild(logo);
+
+      var title = document.createElement("div");
+      title.className = "playoff-header-title";
+      title.innerText = sport === "mlb" ? "MLB Playoffs" : sport === "nhl" ? "NHL Playoffs" : "NBA Playoffs";
+      header.appendChild(title);
+
+      return header;
+    },
+
+    // Row-height (row_h) unit constants shared with playoff-bracket-shared.js's
+    // geometry helpers (spec §7.2): the column-label strip is ~0.8 row_h tall,
+    // and the bracket has ~0.5 row_h of breathing room below the last row.
+    _PLAYOFF_LABEL_UNITS: 0.8,
+    _PLAYOFF_PAD_UNITS: 0.5,
+
+    _buildPlayoffBracket: function (Lib, sport, bracket) {
+      var isMlb = sport === "mlb";
+      var colTops, bodyHeightUnits;
+
+      if (isMlb) {
+        var t = Lib.mlbColumnTopsUnits();
+        colTops = [t.WC, t.DS, t.LCS, t.WS, t.LCS, t.DS, t.WC];
+        bodyHeightUnits = t.bodyHeightUnits;
+      } else {
+        var p = Lib.pairsColumnTopsUnits();
+        colTops = [p.rounds[0], p.rounds[1], p.rounds[2], p.rounds[2], p.rounds[2], p.rounds[1], p.rounds[0]];
+        bodyHeightUnits = p.bodyHeightUnits;
+      }
+
+      var labelUnits = this._PLAYOFF_LABEL_UNITS;
+      var padUnits = this._PLAYOFF_PAD_UNITS;
+      var totalUnits = labelUnits + bodyHeightUnits + padUnits;
+
+      var container = document.createElement("div");
+      container.className = "playoff-bracket";
+      container.style.height = "calc(var(--row-h) * " + totalUnits + ")";
+
+      var inner = document.createElement("div");
+      inner.className = "playoff-bracket-inner";
+
+      var columnsWrap = document.createElement("div");
+      columnsWrap.className = "playoff-bracket-columns";
+      for (var i = 0; i < 7; i++) {
+        columnsWrap.appendChild(this._buildPlayoffColumn(bracket, sport, bracket.columnLabels[i], bracket.columns[i], colTops[i], labelUnits, bodyHeightUnits));
+      }
+      inner.appendChild(columnsWrap);
+
+      inner.appendChild(this._buildPlayoffConnectors(colTops, labelUnits));
+
+      var leftMarker = this._buildPlayoffMarker(sport, bracket.leftLogo, bracket.leftLabel, 2, colTops[2][0], labelUnits, 1.1, "left");
+      if (leftMarker) inner.appendChild(leftMarker);
+      var rightMarker = this._buildPlayoffMarker(sport, bracket.rightLogo, bracket.rightLabel, 4, colTops[4][0], labelUnits, 1.1, "right");
+      if (rightMarker) inner.appendChild(rightMarker);
+
+      if (bracket.champion) {
+        var champMarker = this._buildPlayoffMarker(sport, bracket.champion, null, 3, colTops[3][0], labelUnits, 1.2, "champion");
+        if (champMarker) inner.appendChild(champMarker);
+      }
+
+      container.appendChild(inner);
+      return container;
+    },
+
+    _buildPlayoffColumn: function (bracket, sport, label, slots, tops, labelUnits, bodyHeightUnits) {
+      var col = document.createElement("div");
+      col.className = "playoff-col";
+
+      var labelEl = document.createElement("div");
+      labelEl.className = "playoff-col-label";
+      labelEl.innerText = label;
+      labelEl.style.height = "calc(var(--row-h) * " + labelUnits + ")";
+      col.appendChild(labelEl);
+
+      var body = document.createElement("div");
+      body.className = "playoff-col-body";
+      body.style.height = "calc(var(--row-h) * " + bodyHeightUnits + ")";
+
+      slots.forEach(function (slot, i) {
+        body.appendChild(this._buildPlayoffSlot(bracket, sport, slot, tops[i]));
+      }, this);
+
+      col.appendChild(body);
+      return col;
+    },
+
+    _buildPlayoffSlot: function (bracket, sport, slot, topUnits) {
+      var box = document.createElement("div");
+      box.className = "playoff-slot";
+      box.style.top = "calc(var(--row-h) * " + topUnits + ")";
+      box.style.height = "calc(var(--row-h) * 2)";
+
+      var hasSeries = !!slot.series;
+      var decided = !!slot.winner;
+      var live = hasSeries && !!slot.series.live;
+
+      box.appendChild(this._buildPlayoffSlotRow(
+        bracket, sport, slot.teams[0], hasSeries ? slot.wins[0] : null, decided && slot.winner !== slot.teams[0], live
+      ));
+
+      var divider = document.createElement("div");
+      divider.className = "playoff-slot-divider";
+      box.appendChild(divider);
+
+      box.appendChild(this._buildPlayoffSlotRow(
+        bracket, sport, slot.teams[1], hasSeries ? slot.wins[1] : null, decided && slot.winner !== slot.teams[1], live
+      ));
+
+      return box;
+    },
+
+    _buildPlayoffSlotRow: function (bracket, sport, code, wins, dimmed, live) {
+      var row = document.createElement("div");
+      row.className = "playoff-slot-row";
+      if (dimmed) row.classList.add("playoff-dim");
+
+      if (!code) {
+        var tbd = document.createElement("div");
+        tbd.className = "playoff-tbd";
+        tbd.innerText = "TBD";
+        row.appendChild(tbd);
+        return row;
+      }
+
+      var seed = this._playoffSeedLabel(bracket, code);
+      if (seed != null) {
+        var seedEl = document.createElement("span");
+        seedEl.className = "playoff-seed";
+        seedEl.innerText = "(" + seed + ")";
+        row.appendChild(seedEl);
+      }
+
+      var logoUrl = this._playoffLogoUrl(sport, code);
+      if (logoUrl) {
+        var img = document.createElement("img");
+        img.className = "playoff-slot-logo";
+        img.src = logoUrl;
+        if (dimmed) img.classList.add("playoff-dim-logo");
+        row.appendChild(img);
+      } else {
+        var codeEl = document.createElement("span");
+        codeEl.className = "playoff-slot-code";
+        codeEl.innerText = code;
+        row.appendChild(codeEl);
+      }
+
+      if (wins != null) {
+        var winsEl = document.createElement("span");
+        winsEl.className = "playoff-slot-wins";
+        if (live) winsEl.classList.add("playoff-live");
+        winsEl.innerText = wins;
+        row.appendChild(winsEl);
+      }
+
+      return row;
+    },
+
+    // Side/champion markers sit above a column's innermost slot (spec §7.2):
+    // size = min(row_h*multiplier, slot_top), y = max(0, slot_top - size - row_h*0.4).
+    _buildPlayoffMarker: function (sport, logoCode, labelText, colIndex, slotTopUnits, labelUnits, sizeMultiplier, cssClass) {
+      var sizeUnits = Math.min(sizeMultiplier, slotTopUnits);
+      if (sizeUnits <= 0.05) return null;
+      var yUnits = Math.max(0, slotTopUnits - sizeUnits - 0.4);
+
+      var marker = document.createElement("div");
+      marker.className = "playoff-marker playoff-marker-" + cssClass;
+      marker.style.left = "calc(100% / 7 * " + colIndex + ")";
+      marker.style.width = "calc(100% / 7)";
+      marker.style.top = "calc(var(--row-h) * " + (labelUnits + yUnits) + ")";
+      marker.style.height = "calc(var(--row-h) * " + sizeUnits + ")";
+
+      if (logoCode) {
+        var img = document.createElement("img");
+        img.className = "playoff-marker-logo";
+        img.src = this._playoffLogoUrl(sport, logoCode);
+        marker.appendChild(img);
+      } else if (labelText) {
+        var span = document.createElement("div");
+        span.className = "playoff-marker-label";
+        span.innerText = labelText;
+        marker.appendChild(span);
+      } else {
+        return null;
+      }
+
+      return marker;
+    },
+
+    // Draws the thin lines joining each slot to the slot its winner advances
+    // to (spec §7.2 "Connectors"), as plain positioned <div> bars rather than
+    // SVG: horizontal position is a percentage (columns are equal-width), and
+    // vertical position uses the same row_h-unit system as the slot boxes
+    // (offset by `labelUnits` since this overlay sits directly in
+    // `.playoff-bracket-inner`, outside any column's own label-offset body).
+    _buildPlayoffConnectors: function (colTops, labelUnits) {
+      var wrap = document.createElement("div");
+      wrap.className = "playoff-connectors";
+
+      // Columns sit flush against each other (no grid gap - see .playoff-col
+      // in playoff-bracket.css); the only visible "gap" is the inset each
+      // slot box keeps from its own column edge (--playoff-slot-inset), on
+      // both sides of the shared column boundary. Connector bars are drawn
+      // to span exactly that inset-to-inset gap around the boundary.
+      var INSET = "var(--playoff-slot-inset)";
+
+      function boundaryPercent(i) { return (i / 7) * 100; }
+      function unitY(u) { return labelUnits + u; }
+
+      function addHBar(leftCss, widthCss, yUnits) {
+        var bar = document.createElement("div");
+        bar.className = "playoff-connector playoff-connector-h";
+        bar.style.left = leftCss;
+        bar.style.width = widthCss;
+        bar.style.top = "calc(var(--row-h) * " + yUnits + ")";
+        wrap.appendChild(bar);
+      }
+
+      function addVBar(xCss, yUnitsA, yUnitsB) {
+        var bar = document.createElement("div");
+        bar.className = "playoff-connector playoff-connector-v";
+        bar.style.left = xCss;
+        bar.style.top = "calc(var(--row-h) * " + Math.min(yUnitsA, yUnitsB) + ")";
+        bar.style.height = "calc(var(--row-h) * " + Math.abs(yUnitsB - yUnitsA) + ")";
+        wrap.appendChild(bar);
+      }
+
+      function connect(srcIdx, dstIdx) {
+        var srcTops = colTops[srcIdx], dstTops = colTops[dstIdx];
+        var leftToRight = srcIdx < dstIdx;
+        var b = boundaryPercent(Math.min(srcIdx, dstIdx) + 1);
+        var bExact = b + "%";
+        var bMinus = "calc(" + b + "% - " + INSET + ")";
+
+        if (srcTops.length === dstTops.length) {
+          // One feeder per target: a single straight line across the gap.
+          for (var k = 0; k < srcTops.length; k++) {
+            addHBar(bMinus, "calc(" + INSET + " * 2)", unitY(srcTops[k] + 1));
+          }
+        } else if (srcTops.length === dstTops.length * 2) {
+          // Two feeders merge into one target: elbow via a vertical bar
+          // exactly on the column boundary.
+          var feederOuterEdge = leftToRight ? bMinus : bExact;
+          var targetOuterEdge = leftToRight ? bExact : bMinus;
+          for (var j = 0; j < dstTops.length; j++) {
+            var yA = unitY(srcTops[2 * j] + 1);
+            var yB = unitY(srcTops[2 * j + 1] + 1);
+            var yTarget = unitY(dstTops[j] + 1);
+            addHBar(feederOuterEdge, INSET, yA);
+            addHBar(feederOuterEdge, INSET, yB);
+            addVBar(bExact, yA, yB);
+            addHBar(targetOuterEdge, INSET, yTarget);
+          }
+        }
+      }
+
+      connect(0, 1); connect(1, 2); connect(2, 3);
+      connect(6, 5); connect(5, 4); connect(4, 3);
+
+      return wrap;
+    },
+
+    _buildPlayoffSeriesList: function (Lib, sport, view) {
+      var container = document.createElement("div");
+      container.className = "playoff-series-list";
+
+      var heading = document.createElement("div");
+      heading.className = "playoff-series-heading";
+      heading.innerText = view.heading;
+      container.appendChild(heading);
+
+      var tz = (this.config && this.config.timeZone) || "America/Chicago";
+      var bracket = view.bracket;
+
+      view.seriesList.forEach(function (slot, idx) {
+        if (idx > 0) {
+          var sep = document.createElement("div");
+          sep.className = "playoff-series-sep";
+          container.appendChild(sep);
+        }
+        container.appendChild(this._buildPlayoffSeriesRow(Lib, sport, bracket, slot, tz));
+      }, this);
+
+      return container;
+    },
+
+    _buildPlayoffSeriesRow: function (Lib, sport, bracket, slot, tz) {
+      var row = document.createElement("div");
+      row.className = "playoff-series-row";
+
+      var teamsRow = document.createElement("div");
+      teamsRow.className = "playoff-series-teams";
+
+      var hasSeries = !!slot.series;
+      var decided = !!slot.winner;
+      var live = hasSeries && !!slot.series.live;
+
+      teamsRow.appendChild(this._buildPlayoffSeriesTeam(
+        bracket, sport, slot.teams[0], hasSeries ? slot.wins[0] : null,
+        decided && slot.winner !== slot.teams[0], live, "top"
+      ));
+
+      var dash = document.createElement("div");
+      dash.className = "playoff-series-dash";
+      dash.innerText = "•••";
+      teamsRow.appendChild(dash);
+
+      teamsRow.appendChild(this._buildPlayoffSeriesTeam(
+        bracket, sport, slot.teams[1], hasSeries ? slot.wins[1] : null,
+        decided && slot.winner !== slot.teams[1], live, "bottom"
+      ));
+
+      row.appendChild(teamsRow);
+
+      var status = Lib.seriesStatus(slot.series, bracket.names, tz);
+      var statusEl = document.createElement("div");
+      statusEl.className = "playoff-series-status playoff-status-" + status.cls;
+      statusEl.innerText = status.text;
+      row.appendChild(statusEl);
+
+      return row;
+    },
+
+    _buildPlayoffSeriesTeam: function (bracket, sport, code, wins, dimmed, live, side) {
+      var wrap = document.createElement("div");
+      wrap.className = "playoff-series-team playoff-series-team-" + side;
+      if (dimmed) wrap.classList.add("playoff-dim");
+
+      if (!code) {
+        var tbd = document.createElement("span");
+        tbd.className = "playoff-tbd";
+        tbd.innerText = "TBD";
+        wrap.appendChild(tbd);
+        return wrap;
+      }
+
+      var winsEl = null;
+      if (wins != null) {
+        winsEl = document.createElement("span");
+        winsEl.className = "playoff-series-wins";
+        if (live) winsEl.classList.add("playoff-live");
+        winsEl.innerText = wins;
+      }
+
+      var logoUrl = this._playoffLogoUrl(sport, code);
+      var logoEl;
+      if (logoUrl) {
+        logoEl = document.createElement("img");
+        logoEl.className = "playoff-series-logo";
+        logoEl.src = logoUrl;
+        if (dimmed) logoEl.classList.add("playoff-dim-logo");
+      } else {
+        logoEl = document.createElement("span");
+        logoEl.className = "playoff-series-code";
+        logoEl.innerText = code;
+      }
+
+      var seed = this._playoffSeedLabel(bracket, code);
+      var seedEl = null;
+      if (seed != null) {
+        seedEl = document.createElement("span");
+        seedEl.className = "playoff-seed";
+        seedEl.innerText = "(" + seed + ")";
+      }
+
+      // Top team's box is right-aligned against the dash, bottom team's is
+      // left-aligned against it (spec §7.3), so in DOM order (which flex
+      // preserves regardless of justify-content) the element nearest the
+      // dash must be listed last for "top" and first for "bottom": wins sits
+      // against the dash, with the seed outermost at the far edge.
+      if (side === "top") {
+        if (seedEl) wrap.appendChild(seedEl);
+        wrap.appendChild(logoEl);
+        if (winsEl) wrap.appendChild(winsEl);
+      } else {
+        if (winsEl) wrap.appendChild(winsEl);
+        wrap.appendChild(logoEl);
+        if (seedEl) wrap.appendChild(seedEl);
+      }
+
+      return wrap;
     },
 
     getLogoUrl: function (abbr) {
