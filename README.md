@@ -183,7 +183,7 @@ Notes:
 - Before a league's postseason bracket exists, the screen shows a **projected** bracket built from regular-season standings/seeding (heading reads "Projected Wild Card Series" / "Projected First Round"), so the screen is never blank during the stretch run.
 - Each playoff feed is cached in the helper for 120 seconds, or 30 seconds while any series has a live game, independent of `updateIntervalScores`.
 - If a league has no postseason data at all (offseason with no cached standings yet), the screen shows just the header and a centered "No postseason data" message.
-- The bracket geometry scales with `layoutScale` the same way scoreboard cards do.
+- The playoff screen is 3.5 NFL scoreboard cells wide (595px at the default scale) and scales with `layoutScale` the same way scoreboard cards do. A fixed-length `maxWidth` smaller than that still caps it.
 
 ---
 

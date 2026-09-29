@@ -264,6 +264,7 @@
   var SCOREBOARD_CARD_WIDTH_BASE        = 320;
   var SCOREBOARD_CARD_WIDTH_BASE_COMPACT = 170;
   var MATRIX_GAP_BASE                   = 12;
+  var PLAYOFF_WIDTH_IN_NFL_CELLS        = 3.5;
 
   var CONFIG_KEY_ALIASES = {
     gamesPerColumn: ["scoreboardRows", "rowsPerColumn"]
@@ -3135,11 +3136,14 @@
       var wrapper = document.createElement("div");
       wrapper.className = "playoff-screen playoff-screen-" + sport;
       // Most MagicMirror regions size to their content, and the bracket's slots are
-      // absolutely positioned, so give the screen a preferred width to fill.
-      // A percentage has nothing to resolve against in a content-sized region.
-      var preferredWidth = this._toCssSize(this.config.maxWidth, "800px");
-      if (/%$/.test(preferredWidth)) preferredWidth = "800px";
-      wrapper.style.width = "min(" + preferredWidth + ", 100vw)";
+      // absolutely positioned, so the screen needs an explicit width: 3.5 NFL
+      // scoreboard cells, capped by a fixed-length maxWidth and the viewport.
+      // (A percentage maxWidth has nothing to resolve against in those regions.)
+      var widths = ["calc(var(--scoreboard-card-width-base-compact) * " + PLAYOFF_WIDTH_IN_NFL_CELLS + " * var(--box-scale))"];
+      var cap = this._toCssSize(this.config.maxWidth, "800px");
+      if (!/%$/.test(cap)) widths.push(cap);
+      widths.push("100vw");
+      wrapper.style.width = "min(" + widths.join(", ") + ")";
 
       wrapper.appendChild(this._buildPlayoffHeader(sport));
 
