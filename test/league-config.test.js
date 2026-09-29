@@ -8,6 +8,17 @@ test('coerceLeagueArray handles all, arrays, commas, whitespace, and duplicates'
   assert.deepEqual(leagueConfig.coerceLeagueArray('all'), leagueConfig.SUPPORTED_LEAGUES);
 });
 
+test('playoff screens are accepted when listed explicitly but not pulled in by "all"', () => {
+  assert.deepEqual(leagueConfig.coerceLeagueArray('mlb_playoffs'), ['mlb_playoffs']);
+  assert.deepEqual(leagueConfig.coerceLeagueArray(['mlb', 'NHL_PLAYOFFS', 'nba_playoffs']), ['mlb', 'nhl_playoffs', 'nba_playoffs']);
+  assert.ok(!leagueConfig.coerceLeagueArray('all').some((l) => l.endsWith('_playoffs')));
+  assert.deepEqual(leagueConfig.coerceLeagueArray('all, mlb_playoffs'), leagueConfig.SUPPORTED_LEAGUES.concat(['mlb_playoffs']));
+  assert.deepEqual(
+    leagueConfig.resolveConfiguredLeagues({ leagues: ['mlb', 'mlb_playoffs'] }, '2026-09-29'),
+    ['mlb', 'mlb_playoffs']
+  );
+});
+
 test('seasonal filtering is configurable', () => {
   assert.equal(leagueConfig.isNhlBreakWindow('2026-02-10', {}), true);
   assert.equal(leagueConfig.isNhlBreakWindow('2026-02-10', { seasonalFiltering: false }), false);

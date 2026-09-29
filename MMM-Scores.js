@@ -445,8 +445,10 @@
       var out = [], seen = {};
       for (var k = 0; k < tokens.length; k++) {
         var lower = String(tokens[k]).toLowerCase();
-        if (lower === "all") return SUPPORTED_LEAGUES.slice();
-        if (ALL_LEAGUE_TOKENS.indexOf(lower) !== -1 && !seen[lower]) { out.push(lower); seen[lower] = true; }
+        var matches = lower === "all" ? SUPPORTED_LEAGUES : (ALL_LEAGUE_TOKENS.indexOf(lower) !== -1 ? [lower] : []);
+        for (var m = 0; m < matches.length; m++) {
+          if (!seen[matches[m]]) { out.push(matches[m]); seen[matches[m]] = true; }
+        }
       }
       return out;
     },

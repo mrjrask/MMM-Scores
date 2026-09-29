@@ -39,13 +39,16 @@
 
     var normalized = [];
     var seen = {};
+    function add(league) {
+      if (!seen[league]) {
+        normalized.push(league);
+        seen[league] = true;
+      }
+    }
     for (var k = 0; k < tokens.length; k += 1) {
       var lower = String(tokens[k]).toLowerCase();
-      if (lower === "all") return SUPPORTED_LEAGUES.slice();
-      if (SUPPORTED_LEAGUES.indexOf(lower) !== -1 && !seen[lower]) {
-        normalized.push(lower);
-        seen[lower] = true;
-      }
+      if (lower === "all") SUPPORTED_LEAGUES.forEach(add);
+      else if (ALL_LEAGUE_TOKENS.indexOf(lower) !== -1) add(lower);
     }
     return normalized;
   }
