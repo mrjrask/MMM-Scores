@@ -41,7 +41,7 @@ const mlbFixture = {
   ]
 };
 
-test('a playoff league produces a header, bracket, and series list with the right slot/row counts', () => {
+test('a playoff league produces a bracket and series list with the right slot/row counts', () => {
   const definition = loadModuleDefinition();
   const instance = createInstance(definition, { currentExtras: { playoffs: mlbFixture } });
 
@@ -49,15 +49,17 @@ test('a playoff league produces a header, bracket, and series list with the righ
   assert.equal(screen.className, 'playoff-screen playoff-screen-mlb');
   // 3.5 NFL scoreboard cells wide, capped by a fixed maxWidth and the viewport.
   const nflCells = 'calc(var(--scoreboard-card-width-base-compact) * 3.5 * var(--box-scale))';
-  assert.equal(screen.style.width, `min(${nflCells}, 800px, 100vw)`);
+  assert.equal(screen.style.width, 'var(--playoff-width)');
+  assert.equal(screen.style._store['--playoff-width'], `min(${nflCells}, 800px, 100vw)`);
 
   const pct = createInstance(definition, { currentExtras: { playoffs: mlbFixture } });
   pct.config.maxWidth = '100%';
-  assert.equal(pct._buildPlayoffScreen('mlb_playoffs').style.width, `min(${nflCells}, 100vw)`);
+  assert.equal(pct._buildPlayoffScreen('mlb_playoffs').style._store['--playoff-width'], `min(${nflCells}, 100vw)`);
   const px = createInstance(definition, { currentExtras: { playoffs: mlbFixture } });
   px.config.maxWidth = 500;
-  assert.equal(px._buildPlayoffScreen('mlb_playoffs').style.width, `min(${nflCells}, 500px, 100vw)`);
-  assert.deepEqual(screen.children.map((c) => c.className), ['playoff-header', 'playoff-bracket', 'playoff-series-list']);
+  assert.equal(px._buildPlayoffScreen('mlb_playoffs').style._store['--playoff-width'], `min(${nflCells}, 500px, 100vw)`);
+  // The title lives in the module header (getHeader), not in the screen body.
+  assert.deepEqual(screen.children.map((c) => c.className), ['playoff-bracket', 'playoff-series-list']);
 
   // 2 WC + 2 DS + 1 LCS + 1 WS + 1 LCS + 2 DS + 2 WC = 11 slot boxes.
   assert.equal(findAllExact(screen, 'playoff-slot').length, 11);
@@ -65,13 +67,13 @@ test('a playoff league produces a header, bracket, and series list with the righ
   assert.equal(findAllExact(screen, 'playoff-series-row').length, 4);
 });
 
-test('no playoff data yields just the header plus a "No postseason data" message', () => {
+test('no playoff data yields a "No postseason data" message', () => {
   const definition = loadModuleDefinition();
   const instance = createInstance(definition, { currentExtras: null });
 
   const screen = instance._buildPlayoffScreen('nhl_playoffs');
-  assert.deepEqual(screen.children.map((c) => c.className), ['playoff-header', 'playoff-no-data']);
-  assert.equal(screen.children[1].innerText, 'No postseason data');
+  assert.deepEqual(screen.children.map((c) => c.className), ['playoff-no-data']);
+  assert.equal(screen.children[0].innerText, 'No postseason data');
 });
 
 function baseClasses(node) {
@@ -129,4 +131,15 @@ test('a decided slot dims the loser’s row and logo', () => {
   assert.equal(dimmedRows.length, 1);
   const dimmedLogo = dimmedRows[0].children.find((c) => c.className && c.className.includes('playoff-slot-logo'));
   assert.ok(dimmedLogo.className.includes('playoff-dim-logo'));
+});
+
+test('playoff screens use the module header for their title, like the scoreboards', () => {
+  const definition = loadModuleDefinition();
+  for (const [league, title] of [['mlb_playoffs', 'MLB Playoffs'], ['nhl_playoffs', 'NHL Playoffs'], ['nba_playoffs', 'NBA Playoffs']]) {
+    const instance = createInstance(definition, { _getLeague() { return league; } });
+    instance.config.showTitle = true;
+    assert.equal(instance.getHeader(), title);
+    instance.config.showTitle = false;
+    assert.equal(instance.getHeader(), null);
+  }
 });
