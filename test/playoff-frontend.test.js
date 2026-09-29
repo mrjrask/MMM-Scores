@@ -47,9 +47,15 @@ test('a playoff league produces a header, bracket, and series list with the righ
 
   const screen = instance._buildPlayoffScreen('mlb_playoffs');
   assert.equal(screen.className, 'playoff-screen playoff-screen-mlb');
-  // .playoff-screen is a CSS size container (no intrinsic width), so it needs an
-  // explicit width or it collapses to 0px in MagicMirror's content-sized regions.
+  // Most MagicMirror regions size to their content; the screen needs a preferred width.
   assert.equal(screen.style.width, 'min(800px, 100vw)');
+
+  const pct = createInstance(definition, { currentExtras: { playoffs: mlbFixture } });
+  pct.config.maxWidth = '100%';
+  assert.equal(pct._buildPlayoffScreen('mlb_playoffs').style.width, 'min(800px, 100vw)');
+  const px = createInstance(definition, { currentExtras: { playoffs: mlbFixture } });
+  px.config.maxWidth = 600;
+  assert.equal(px._buildPlayoffScreen('mlb_playoffs').style.width, 'min(600px, 100vw)');
   assert.deepEqual(screen.children.map((c) => c.className), ['playoff-header', 'playoff-bracket', 'playoff-series-list']);
 
   // 2 WC + 2 DS + 1 LCS + 1 WS + 1 LCS + 2 DS + 2 WC = 11 slot boxes.

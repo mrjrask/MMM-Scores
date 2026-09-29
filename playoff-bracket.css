@@ -32,8 +32,6 @@
 }
 
 .playoff-screen {
-  container-type: inline-size;
-  container-name: playoff-screen;
   max-width: 100%;
   margin: 0 auto;
   box-sizing: border-box;
@@ -84,7 +82,10 @@
 
 /* Narrow regions drop the bracket and show only the header + series list
    (spec §1 point 4). */
-@container playoff-screen (max-width: 199px) {
+/* Deliberately a viewport media query, not a container query: making
+   .playoff-screen a size container gives it zero intrinsic width, which
+   collapses it to 0px inside MagicMirror's content-sized regions. */
+@media (max-width: 199px) {
   .playoff-bracket {
     display: none;
   }

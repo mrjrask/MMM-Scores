@@ -3134,9 +3134,12 @@
       var sport = this._playoffSportForLeague(league);
       var wrapper = document.createElement("div");
       wrapper.className = "playoff-screen playoff-screen-" + sport;
-      // .playoff-screen is a size container, so it has no intrinsic width of its
-      // own; without an explicit width it collapses to 0 in content-sized regions.
-      wrapper.style.width = "min(" + this._toCssSize(this.config.maxWidth, "800px") + ", 100vw)";
+      // Most MagicMirror regions size to their content, and the bracket's slots are
+      // absolutely positioned, so give the screen a preferred width to fill.
+      // A percentage has nothing to resolve against in a content-sized region.
+      var preferredWidth = this._toCssSize(this.config.maxWidth, "800px");
+      if (/%$/.test(preferredWidth)) preferredWidth = "800px";
+      wrapper.style.width = "min(" + preferredWidth + ", 100vw)";
 
       wrapper.appendChild(this._buildPlayoffHeader(sport));
 
