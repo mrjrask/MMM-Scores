@@ -42,7 +42,6 @@
   font-family: var(--scoreboard-font-family);
   display: flex;
   flex-direction: column;
-  gap: calc(var(--row-h) * 0.45);
   padding-bottom: 12px;
 }
 
@@ -251,7 +250,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding: calc(var(--box-scale) * 4px) 0;
+  padding: 0 0 calc(var(--box-scale) * 4px);
 }
 
 .playoff-series-row {

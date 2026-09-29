@@ -3183,11 +3183,10 @@
       return wrapper;
     },
 
-    // Row-height (row_h) unit constants shared with playoff-bracket-shared.js's
-    // geometry helpers (spec §7.2): the column-label strip is ~0.8 row_h tall,
-    // and the bracket has ~0.5 row_h of breathing room below the last row.
+    // Row-height (row_h) unit constant shared with playoff-bracket-shared.js's
+    // geometry helpers (spec §7.2): the column-label strip is ~0.8 row_h tall.
+    // The bracket ends at its lowest slot so the series title sits right below.
     _PLAYOFF_LABEL_UNITS: 0.8,
-    _PLAYOFF_PAD_UNITS: 0.5,
 
     _buildPlayoffBracket: function (Lib, sport, bracket) {
       var isMlb = sport === "mlb";
@@ -3204,8 +3203,7 @@
       }
 
       var labelUnits = this._PLAYOFF_LABEL_UNITS;
-      var padUnits = this._PLAYOFF_PAD_UNITS;
-      var totalUnits = labelUnits + bodyHeightUnits + padUnits;
+      var totalUnits = labelUnits + bodyHeightUnits;
 
       var container = document.createElement("div");
       container.className = "playoff-bracket";
