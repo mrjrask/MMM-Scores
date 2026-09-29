@@ -3134,6 +3134,9 @@
       var sport = this._playoffSportForLeague(league);
       var wrapper = document.createElement("div");
       wrapper.className = "playoff-screen playoff-screen-" + sport;
+      // .playoff-screen is a size container, so it has no intrinsic width of its
+      // own; without an explicit width it collapses to 0 in content-sized regions.
+      wrapper.style.width = "min(" + this._toCssSize(this.config.maxWidth, "800px") + ", 100vw)";
 
       wrapper.appendChild(this._buildPlayoffHeader(sport));
 

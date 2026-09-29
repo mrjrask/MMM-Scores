@@ -34,6 +34,9 @@
 .playoff-screen {
   container-type: inline-size;
   container-name: playoff-screen;
+  max-width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
   color: var(--playoff-text);
   font-family: var(--scoreboard-font-family);
   display: flex;
