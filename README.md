@@ -159,12 +159,11 @@ Olympic hockey country mapping uses IOC-style 3-letter codes (`CAN`, `USA`, `FIN
 ---
 
 ## Playoff Bracket Screens
-Three additional screens show a full postseason bracket instead of a day's scoreboard: `mlb_playoffs`, `nhl_playoffs`, and `nba_playoffs`. Each one draws:
+Three additional screens show a full postseason bracket instead of a day's scoreboard: `mlb_playoffs`, `nhl_playoffs`, and `nba_playoffs`. Like the scoreboards, each one is titled in the module header ("MLB Playoffs", etc., hidden with `showTitle: false`), and draws:
 
-1. A header with the league's postseason logo and title (e.g. "MLB Playoffs").
-2. A seven-column bracket (`WC · DS · LCS · WS · LCS · DS · WC` for MLB; `R1 · R2 · CF · SCF/Finals · CF · R2 · R1` for NHL/NBA), with the AL/West on the left and the NL/East on the right. Decided series dim the loser, live series turn both scores yellow, and undecided future rounds show the matchup already known from seeding with no scores ("TBD" when a team isn't known yet).
-3. A single-column list of every series in the **current round** (the earliest round with an unfinished series, or the last round once everything is decided), each with a status line ("Game 2 · Tonight 7 PM", "Royals win 2-0", "Series tied 1-1", etc).
-4. On narrow MagicMirror regions (under ~200px wide) the bracket is dropped automatically and only the header and series list show.
+1. A seven-column bracket (`WC · DS · LCS · WS · LCS · DS · WC` for MLB; `R1 · R2 · CF · SCF/Finals · CF · R2 · R1` for NHL/NBA), with the AL/West on the left and the NL/East on the right. Decided series dim the loser, live series turn both scores yellow, and undecided future rounds show the matchup already known from seeding with no scores ("TBD" when a team isn't known yet).
+2. A single-column list of every series in the **current round** (the earliest round with an unfinished series, or the last round once everything is decided), each with a status line ("Game 2 · Tonight 7 PM", "Royals win 2-0", "Series tied 1-1", etc).
+3. On very narrow displays (under 200px wide) the bracket is dropped automatically and only the series list shows.
 
 Add one or more to your rotation like any other league:
 ```js
@@ -182,7 +181,7 @@ Add one or more to your rotation like any other league:
 Notes:
 - Before a league's postseason bracket exists, the screen shows a **projected** bracket built from regular-season standings/seeding (heading reads "Projected Wild Card Series" / "Projected First Round"), so the screen is never blank during the stretch run.
 - Each playoff feed is cached in the helper for 120 seconds, or 30 seconds while any series has a live game, independent of `updateIntervalScores`.
-- If a league has no postseason data at all (offseason with no cached standings yet), the screen shows just the header and a centered "No postseason data" message.
+- If a league has no postseason data at all (offseason with no cached standings yet), the screen shows a centered "No postseason data" message.
 - The playoff screen is 3.5 NFL scoreboard cells wide (595px at the default scale) and scales with `layoutScale` the same way scoreboard cards do. A fixed-length `maxWidth` smaller than that still caps it.
 
 ---

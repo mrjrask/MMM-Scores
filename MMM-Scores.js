@@ -324,7 +324,9 @@
       if (league === "worldcup") return "World Cup Scoreboard";
       if (league === "olympic_mhockey") return "Men's Olympic Hockey Scoreboard";
       if (league === "olympic_whockey") return "Women's Olympic Hockey Scoreboard";
-      if (this._isPlayoffLeague(league)) return null; // the screen draws its own logo + title
+      if (league === "mlb_playoffs") return "MLB Playoffs";
+      if (league === "nhl_playoffs") return "NHL Playoffs";
+      if (league === "nba_playoffs") return "NBA Playoffs";
       return "Scoreboard";
     },
 
@@ -1384,7 +1386,8 @@
       var activeLeagueForData = this._getLeague();
 
       if (this._isPlayoffLeague(activeLeagueForData)) {
-        this._setModuleContentWidth(null);
+        // Keeps the module header the same width as the playoff screen.
+        this._setModuleContentWidth(this._playoffScreenWidthCss());
         try {
           wrapper.appendChild(this._buildPlayoffScreen(activeLeagueForData));
         } catch (e) {
@@ -3131,21 +3134,25 @@
       return (seed == null || seed === "") ? null : String(seed);
     },
 
-    _buildPlayoffScreen: function (league) {
-      var sport = this._playoffSportForLeague(league);
-      var wrapper = document.createElement("div");
-      wrapper.className = "playoff-screen playoff-screen-" + sport;
-      // Most MagicMirror regions size to their content, and the bracket's slots are
-      // absolutely positioned, so the screen needs an explicit width: 3.5 NFL
-      // scoreboard cells, capped by a fixed-length maxWidth and the viewport.
-      // (A percentage maxWidth has nothing to resolve against in those regions.)
+    // Most MagicMirror regions size to their content, and the bracket's slots are
+    // absolutely positioned, so the screen needs an explicit width: 3.5 NFL
+    // scoreboard cells, capped by a fixed-length maxWidth and the viewport.
+    // (A percentage maxWidth has nothing to resolve against in those regions.)
+    _playoffScreenWidthCss: function () {
       var widths = ["calc(var(--scoreboard-card-width-base-compact) * " + PLAYOFF_WIDTH_IN_NFL_CELLS + " * var(--box-scale))"];
       var cap = this._toCssSize(this.config.maxWidth, "800px");
       if (!/%$/.test(cap)) widths.push(cap);
       widths.push("100vw");
-      wrapper.style.width = "min(" + widths.join(", ") + ")";
+      return "min(" + widths.join(", ") + ")";
+    },
 
-      wrapper.appendChild(this._buildPlayoffHeader(sport));
+    _buildPlayoffScreen: function (league) {
+      var sport = this._playoffSportForLeague(league);
+      var wrapper = document.createElement("div");
+      wrapper.className = "playoff-screen playoff-screen-" + sport;
+      // playoff-bracket.css derives the bracket's row height from this width.
+      wrapper.style.setProperty("--playoff-width", this._playoffScreenWidthCss());
+      wrapper.style.width = "var(--playoff-width)";
 
       var data = this.currentExtras && this.currentExtras.playoffs;
       var Lib = this._playoffBracketLib();
@@ -3174,26 +3181,6 @@
       wrapper.appendChild(this._buildPlayoffSeriesList(Lib, sport, view));
 
       return wrapper;
-    },
-
-    _buildPlayoffHeader: function (sport) {
-      var header = document.createElement("div");
-      header.className = "playoff-header";
-
-      var logoPath = sport === "mlb" ? "images/mlb/MLB.png"
-        : sport === "nhl" ? "images/nhl/SCP.png"
-        : "images/nba/NBA.png";
-      var logo = document.createElement("img");
-      logo.className = "playoff-header-logo";
-      logo.src = this.file(logoPath);
-      header.appendChild(logo);
-
-      var title = document.createElement("div");
-      title.className = "playoff-header-title";
-      title.innerText = sport === "mlb" ? "MLB Playoffs" : sport === "nhl" ? "NHL Playoffs" : "NBA Playoffs";
-      header.appendChild(title);
-
-      return header;
     },
 
     // Row-height (row_h) unit constants shared with playoff-bracket-shared.js's
