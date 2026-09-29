@@ -325,6 +325,7 @@ module.exports = NodeHelper.create({
         "mlb_playoffs",
         () => MlbPlayoffData.fetchMlbPostseason({ fetchJson: this._fetchJson.bind(this) })
       );
+      console.log(`🏆 Sending MLB playoffs to front-end: ${(data.series || []).length} series.`);
       this._notifyGames("mlb_playoffs", [], { playoffs: data });
     } catch (e) {
       console.error("🚨 MLB playoffs fetch failed:", e);
@@ -338,6 +339,7 @@ module.exports = NodeHelper.create({
         "nhl_playoffs",
         () => NhlPlayoffData.fetchNhlPlayoffs({ fetchJson: this._fetchJson.bind(this) })
       );
+      console.log(`🏆 Sending NHL playoffs to front-end: ${(data.series || []).length} series.`);
       this._notifyGames("nhl_playoffs", [], { playoffs: data });
     } catch (e) {
       console.error("🚨 NHL playoffs fetch failed:", e);
@@ -351,6 +353,7 @@ module.exports = NodeHelper.create({
         "nba_playoffs",
         () => NbaPlayoffData.fetchNbaPlayoffs({ fetchJson: this._fetchJson.bind(this) })
       );
+      console.log(`🏆 Sending NBA playoffs to front-end: ${(data.series || []).length} series.`);
       this._notifyGames("nba_playoffs", [], { playoffs: data });
     } catch (e) {
       console.error("🚨 NBA playoffs fetch failed:", e);
