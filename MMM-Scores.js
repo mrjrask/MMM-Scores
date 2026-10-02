@@ -733,9 +733,9 @@
     _minimumLayoutForLeague: function (league) {
       if (!league) league = this._getLeague();
       if (EXTENDED_LAYOUT_LEAGUES[league]) {
-        return { columns: DEFAULT_SCOREBOARD_COLUMNS_PRO, rows: DEFAULT_GAMES_PER_COLUMN_PRO };
+        return { columns: 1, rows: DEFAULT_GAMES_PER_COLUMN_PRO };
       }
-      return { columns: DEFAULT_SCOREBOARD_COLUMNS, rows: DEFAULT_GAMES_PER_COLUMN };
+      return { columns: 1, rows: DEFAULT_GAMES_PER_COLUMN };
     },
 
     _maximumGamesPerPageForLeague: function (league) {
