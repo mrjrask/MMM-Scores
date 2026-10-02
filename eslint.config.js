@@ -15,7 +15,9 @@ module.exports = [
     // report them as warnings so only real problems (undefined names, syntax errors) fail CI.
     rules: {
       "no-unused-vars": ["warn", { args: "none", caughtErrors: "none" }],
-      "no-redeclare": ["warn", { builtinGlobals: false }]
+      "no-redeclare": ["warn", { builtinGlobals: false }],
+      "no-useless-assignment": "warn",
+      "preserve-caught-error": "warn"
     }
   }
 ];
