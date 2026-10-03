@@ -261,10 +261,24 @@
   padding: calc(var(--box-scale) * 5px * var(--playoff-series-scale)) 0;
 }
 
+/* The separator is sized by a hidden copy of the heading text (see
+   .playoff-series-sep-fill); the horizontal padding widens the line just
+   slightly beyond the title text. */
 .playoff-series-sep {
+  align-self: center;
+  width: fit-content;
+  max-width: 100%;
   height: var(--playoff-line-w);
+  padding: 0 calc(var(--box-scale) * 10px);
   background: var(--playoff-separator);
-  width: 100%;
+  overflow: hidden;
+}
+
+.playoff-series-sep-fill {
+  visibility: hidden;
+  white-space: nowrap;
+  /* Must match .playoff-series-heading so the line tracks the title width. */
+  font-size: calc(var(--box-scale) * 20px);
 }
 
 .playoff-series-teams {

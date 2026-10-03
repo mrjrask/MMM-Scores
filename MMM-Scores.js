@@ -3448,6 +3448,13 @@
         if (idx > 0) {
           var sep = document.createElement("div");
           sep.className = "playoff-series-sep";
+          // A hidden copy of the heading lets the separator size itself to the
+          // title text (the CSS adds a little horizontal padding so the line
+          // ends up just slightly wider than the heading).
+          var fill = document.createElement("span");
+          fill.className = "playoff-series-sep-fill";
+          fill.textContent = view.heading;
+          sep.appendChild(fill);
           container.appendChild(sep);
         }
         container.appendChild(this._buildPlayoffSeriesRow(Lib, sport, bracket, slot, tz));
