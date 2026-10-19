@@ -214,6 +214,30 @@ function seriesFromGames(payload) {
     });
 
     var neededWins = Math.floor(bestOf / 2) + 1;
+
+    // The API reports the running series record on each game's `leagueRecord`;
+    // prefer it over our own tally, which drifts if a game is skipped or
+    // mis-credited. Use the game with the most decisions (the latest record).
+    var official = null;
+    games.forEach(function (g) {
+      var h = g.raw.teams.home && g.raw.teams.home.leagueRecord;
+      var a = g.raw.teams.away && g.raw.teams.away.leagueRecord;
+      if (!h || !a) return;
+      var hw = h.wins, aw = a.wins;
+      if (!Number.isInteger(hw) || !Number.isInteger(aw) || hw < 0 || aw < 0) return;
+      if (hw > neededWins || aw > neededWins || hw + aw > bestOf) return;
+      if (!official || hw + aw > official.total) {
+        var rec = {};
+        rec[g.homeCode] = hw;
+        rec[g.awayCode] = aw;
+        official = { total: hw + aw, wins: rec };
+      }
+    });
+    if (official) {
+      wins[topTeam] = official.wins[topTeam] || 0;
+      wins[bottomTeam] = official.wins[bottomTeam] || 0;
+    }
+
     var winner = null;
     if (wins[topTeam] >= neededWins) winner = topTeam;
     else if (wins[bottomTeam] >= neededWins) winner = bottomTeam;

@@ -130,3 +130,19 @@ test('seedsFromStandings gives no seeds for a league without three division lead
   const seeds = MlbPlayoffs.seedsFromStandings(standingsPayload);
   assert.deepEqual(seeds.AL, {});
 });
+
+test('seriesFromGames prefers the API series record (leagueRecord) over its own tally', () => {
+  const cle = (rec, extra) => Object.assign({ team: { id: 114, name: 'Cleveland Guardians', abbreviation: 'CLE', league: { id: 103 } }, leagueRecord: rec }, extra);
+  const tb = (rec, extra) => Object.assign({ team: { id: 139, name: 'Tampa Bay Rays', abbreviation: 'TB', league: { id: 103 } }, leagueRecord: rec }, extra);
+  // Game 4 has no winner/score data, so a naive tally would miss it.
+  const payload = { dates: [{ games: [
+    game({ gamePk: 1, gameType: 'L', gamesInSeries: 7, seriesGameNumber: 1, gameDate: '2026-10-14T23:00:00Z',
+      teams: { home: tb({ wins: 1, losses: 0 }, { isWinner: true, score: 3 }), away: cle({ wins: 0, losses: 1 }, { isWinner: false, score: 1 }) } }),
+    game({ gamePk: 4, gameType: 'L', gamesInSeries: 7, seriesGameNumber: 4, gameDate: '2026-10-18T23:00:00Z',
+      teams: { home: tb({ wins: 3, losses: 2 }, {}), away: cle({ wins: 2, losses: 3 }, {}) } })
+  ] }] };
+  const s = MlbPlayoffs.seriesFromGames(payload)[0];
+  assert.deepEqual(s.teams, ['TB', 'CLE']);
+  assert.deepEqual(s.wins, { TB: 3, CLE: 2 });
+  assert.equal(s.winner, null);
+});
