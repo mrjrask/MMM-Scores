@@ -2587,33 +2587,26 @@
 
     _createNbaGameCard: function (game) {
       var league = "nba";
-      var competition = game && game.competitions && game.competitions[0];
-      if (!competition) competition = {};
+      game = game || {};
+      var status = game.status || {};
+      var linescore = game.linescore || {};
+      var state = String(status.abstractGameState || "").toLowerCase();
+      var detailed = status.detailedState || "";
 
-      var status = (competition.status && competition.status.type) || game.status && game.status.type || {};
-      var state = (status.state || "").toLowerCase();
-      var detailed = status.shortDetail || status.detail || status.description || "";
-
-      var isPreview = state === "pre" || state === "preview" || state === "scheduled";
-      var isFinal = state === "post" || state === "final" || !!status.completed;
-      var isLive = state === "in" || state === "live";
+      var isPreview = state === "preview";
+      var isFinal = state === "final";
+      var isLive = state === "live";
 
       var showVals = !isPreview;
 
       var statusText = "";
       if (isPreview) {
-        statusText = this._formatStartTime(competition.date || game.date);
+        statusText = this._formatStartTime(game.gameDate);
       } else if (isFinal) {
         statusText = detailed || "Final";
       } else if (isLive) {
-        var period = this._firstNumber(
-          competition.status && competition.status.period,
-          status.period,
-          game.status && game.status.period
-        );
-        var ord = this._ordinal(period);
-        var clock = competition.status && (competition.status.displayClock || competition.status.clock);
-        if (!clock && status) clock = status.displayClock || status.clock;
+        var ord = this._ordinal(linescore.currentPeriod);
+        var clock = linescore.currentPeriodTimeRemaining;
         var specialStatus = this._resolveNbaSpecialLiveStatus({
           clock: clock,
           detailed: detailed
@@ -2635,66 +2628,16 @@
       else if (isLive) cardClasses.push("is-live");
       else if (isPreview) cardClasses.push("is-preview");
 
-      var competitors = competition.competitors || [];
-      var away = null, home = null;
-      for (var i = 0; i < competitors.length; i++) {
-        var comp = competitors[i];
-        if (!comp) continue;
-        var side = (comp.homeAway || comp.homeAway === 0) ? String(comp.homeAway).toLowerCase() : "";
-        if (side === "home") home = comp;
-        else if (side === "away") away = comp;
-      }
-
-      if (!away && competitors.length > 0) away = competitors[0];
-      if (!home && competitors.length > 1) home = competitors[1];
+      var teams = game.teams || {};
+      var pair = [teams.away || {}, teams.home || {}];
+      var scores = [this._firstNumber(pair[0].score), this._firstNumber(pair[1].score)];
 
       var rows = [];
-      var pair = [away, home];
       for (var idx = 0; idx < pair.length; idx++) {
-        var entry = pair[idx] || {};
-        var team = entry.team || {};
-        var abbr = this._abbrForTeam(team, league);
+        var abbr = this._abbrForTeam(pair[idx].team || {}, league);
         var highlight = this._isHighlighted(abbr);
-
-        var scoreNum = this._firstNumber(entry.score, entry.points, team && team.score);
-
-        var lineScores = Array.isArray(entry.linescores) ? entry.linescores : [];
-        var quarters = [];
-        for (var lsIdx = 0; lsIdx < lineScores.length; lsIdx++) {
-          var ls = lineScores[lsIdx];
-          var period = this._firstNumber(ls && ls.period, ls && ls.sequenceNumber);
-          if (!Number.isFinite(period)) continue;
-          var periodIndex = Math.max(0, parseInt(period, 10) - 1);
-          quarters[periodIndex] = this._firstNumber(
-            ls.value,
-            ls.displayValue,
-            ls.score,
-            ls.points
-          );
-        }
-
-        var totalScore = scoreNum;
-        if (totalScore == null) {
-          var running = 0;
-          var haveQuarter = false;
-          for (var qIdx = 0; qIdx < quarters.length; qIdx++) {
-            var qVal = quarters[qIdx];
-            if (qVal == null || qVal === "") continue;
-            var numeric = Number(qVal);
-            if (!isNaN(numeric)) {
-              running += numeric;
-              haveQuarter = true;
-            }
-          }
-          if (haveQuarter) totalScore = running;
-        }
-
-        var otherScore = null;
-        if (idx === 0 && home) {
-          otherScore = this._firstNumber(home.score, home.points, home.team && home.team.score);
-        } else if (idx === 1 && away) {
-          otherScore = this._firstNumber(away.score, away.points, away.team && away.team.score);
-        }
+        var totalScore = scores[idx];
+        var otherScore = scores[1 - idx];
 
         var isLoser = false;
         if (isFinal && totalScore != null && otherScore != null && totalScore !== otherScore) {
@@ -2713,7 +2656,7 @@
         });
       }
 
-      if (!showVals && league !== "worldcup" && this._rowsContainValues(rows)) showVals = true;
+      if (!showVals && this._rowsContainValues(rows)) showVals = true;
 
       return this._createScoreboardCard({
         league: league,
