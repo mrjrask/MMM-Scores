@@ -6,6 +6,7 @@ const http       = require("http");
 const https      = require("https");
 const { URL }    = require("url");
 const LeagueConfig = require("./shared-league-config");
+const ScoreboardNormalizer = require("./scoreboard-normalizer");
 const MlbPlayoffData = require("./playoff-data-mlb");
 const NhlPlayoffData = require("./playoff-data-nhl");
 const NbaPlayoffData = require("./playoff-data-nba");
@@ -1940,12 +1941,15 @@ module.exports = NodeHelper.create({
       if (context.beforeUpdateCutoff) {
         const scheduleUrl = `https://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard?dates=${context.todayCompact}`;
         try {
-          scheduleGames = this._collectEspnScoreboardEvents(await this._fetchJson(scheduleUrl, {}, scheduleUrl));
+          scheduleGames = ScoreboardNormalizer.normalizeEspnNbaEvents(
+            this._collectEspnScoreboardEvents(await this._fetchJson(scheduleUrl, {}, scheduleUrl))
+          );
         } catch (scheduleError) {
           console.warn(`⚠️ Schedule fetch failed for ${context.todayIso}:`, scheduleError.message || scheduleError);
         }
       }
-      const displayEvents = context.beforeUpdateCutoff ? this._finalGamesOnly(events) : events;
+      const games = ScoreboardNormalizer.normalizeEspnNbaEvents(events);
+      const displayEvents = context.beforeUpdateCutoff ? this._finalGamesOnly(games) : games;
       console.log(`🏀 Sending ${displayEvents.length} NBA games for ${dateIso} to front-end.`);
       this._notifyGames("nba", displayEvents, { scheduleGames, showingPreviousFinals: context.beforeUpdateCutoff });
     } catch (e) {
