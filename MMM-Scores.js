@@ -377,8 +377,6 @@
       var self = this;
       var sendInit = function () { self.sendSocketNotification("INIT", self._buildHelperConfig()); };
       sendInit();
-      var refreshInterval = this._asPositiveInt(this.config.updateIntervalScores, 60 * 1000);
-      setInterval(sendInit, refreshInterval);
 
       this._scheduleRotate();
     },

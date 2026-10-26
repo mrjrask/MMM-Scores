@@ -191,6 +191,11 @@ module.exports = NodeHelper.create({
     this._lastGoodByLeague = {};
   },
 
+  stop() {
+    clearInterval(this.fetchTimer);
+    this.fetchTimer = null;
+  },
+
   socketNotificationReceived(notification, payload) {
     if (notification === "INIT") {
       this.config = payload || {};
@@ -262,23 +267,29 @@ module.exports = NodeHelper.create({
     return res.text();
   },
   async _fetchGames() {
-    const leagues = Array.isArray(this.leagues) && this.leagues.length > 0
-      ? this.leagues
-      : [this._getLeague()];
+    if (this._fetchInFlight) return;
+    this._fetchInFlight = true;
+    try {
+      const leagues = Array.isArray(this.leagues) && this.leagues.length > 0
+        ? this.leagues
+        : [this._getLeague()];
 
-    // League fetches are intentionally independent so one slow provider does not
-    // block the entire MagicMirror rotation.
-    const unique = Array.from(new Set(leagues.map((league) => league === "wbc" ? "mlb" : league)));
-    const tasks = unique.map((league) => this._fetchLeagueGames(league));
-    const results = await Promise.allSettled(tasks);
+      // League fetches are intentionally independent so one slow provider does not
+      // block the entire MagicMirror rotation.
+      const unique = Array.from(new Set(leagues.map((league) => league === "wbc" ? "mlb" : league)));
+      const tasks = unique.map((league) => this._fetchLeagueGames(league));
+      const results = await Promise.allSettled(tasks);
 
-    results.forEach((result, index) => {
-      if (result.status === "rejected") {
-        const league = unique[index];
-        console.error(`🚨 ${league} fetch loop failed:`, result.reason);
-        this._notifyGamesWithFallback(league, [], { errorMessage: result.reason && result.reason.message });
-      }
-    });
+      results.forEach((result, index) => {
+        if (result.status === "rejected") {
+          const league = unique[index];
+          console.error(`🚨 ${league} fetch loop failed:`, result.reason);
+          this._notifyGamesWithFallback(league, [], { errorMessage: result.reason && result.reason.message });
+        }
+      });
+    } finally {
+      this._fetchInFlight = false;
+    }
   },
 
   async _fetchLeagueGames(league) {
