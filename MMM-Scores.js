@@ -636,7 +636,7 @@
       }
 
       var scoreboardPages = (this.games.length > 0)
-        ? Math.ceil(this.games.length / this._gamesPerPage)
+        ? Math.ceil(this._scoreboardGames().length / this._gamesPerPage)
         : 0;
       this._scoreboardPageCount = scoreboardPages;
 
@@ -652,6 +652,27 @@
 
       this.totalGamePages = totalPages;
       if (this.currentScreen >= this.totalGamePages) this.currentScreen = 0;
+    },
+
+    // Games for the scoreboard pages. In NFL, a final "bye week" cell follows
+    // the games when any teams are on bye for the displayed week.
+    _scoreboardGames: function () {
+      var games = Array.isArray(this.games) ? this.games : [];
+      if (games.length === 0 || this._getLeague() !== "nfl") return games;
+      var extras = this.currentExtras;
+      var byeTeams = extras && Array.isArray(extras.teamsOnBye) ? extras.teamsOnBye : [];
+      var abbrs = [];
+      for (var i = 0; i < byeTeams.length; i++) {
+        var entry = byeTeams[i];
+        if (!entry) continue;
+        var abbr = entry.abbreviation || entry.abbr || entry.teamAbbr || entry.uid || entry.id;
+        if (!abbr) continue;
+        abbr = String(abbr).toUpperCase();
+        if (abbrs.indexOf(abbr) === -1) abbrs.push(abbr);
+      }
+      if (abbrs.length === 0) return games;
+      abbrs.sort();
+      return games.concat([{ nflByeCell: true, teams: abbrs }]);
     },
 
     _getHighlightedTeamsConfig: function () {
@@ -1484,7 +1505,7 @@
 
       if (scoreboardPages > 0 && this.currentScreen < scoreboardPages) {
         var start = this.currentScreen * this._gamesPerPage;
-        pageGames = this.games.slice(start, start + this._gamesPerPage);
+        pageGames = this._scoreboardGames().slice(start, start + this._gamesPerPage);
       } else if (scheduleGamesForLeague.length > 0 && this.currentScreen >= scoreboardPages) {
         var schedulePageIndex = this.currentScreen - scoreboardPages;
         var scheduleStart = schedulePageIndex * this._gamesPerPage;
@@ -1551,17 +1572,6 @@
         scoreboardRendered = !isSchedulePage;
       }
 
-      if (scoreboardRendered && activeLeague === "nfl") {
-        var extras = this.currentExtras;
-        var byeTeams = extras && Array.isArray(extras.teamsOnBye) ? extras.teamsOnBye : [];
-        var totalPages = Math.max(1, this.totalGamePages || 1);
-        var onLastPage = this.currentScreen >= (totalPages - 1);
-        if (onLastPage) {
-          var byeSection = this._buildNflByeSection(byeTeams);
-          if (byeSection) container.appendChild(byeSection);
-        }
-      }
-
       return container;
     },
 
@@ -1624,79 +1634,39 @@
     },
 
 
-    _buildNflByeSection: function (byeTeams) {
-      if (!Array.isArray(byeTeams) || byeTeams.length === 0) return null;
-
-      var normalized = [];
-      for (var i = 0; i < byeTeams.length; i++) {
-        var entry = byeTeams[i];
-        if (!entry) continue;
-        var abbr = entry.abbreviation || entry.abbr || entry.teamAbbr || entry.uid || entry.id;
-        if (!abbr) continue;
-        abbr = String(abbr).toUpperCase();
-        var name = entry.displayName || entry.shortDisplayName || entry.name || entry.location || abbr;
-        normalized.push({ abbr: abbr, name: name });
-      }
-
-      if (normalized.length === 0) return null;
-
-      normalized.sort(function (a, b) {
-        if (a.abbr < b.abbr) return -1;
-        if (a.abbr > b.abbr) return 1;
-        return a.name.localeCompare(b.name);
+    _createNflByeCard: function (game) {
+      var card = this._createScoreboardCard({
+        league: "nfl",
+        statusText: "BYE WEEK",
+        metricLabels: [],
+        rows: [],
+        cardClasses: ["is-bye"]
       });
+      var body = card.querySelector(".scoreboard-body");
+      if (!body) return card;
 
-      var section = document.createElement("div");
-      section.className = "bye-week-section";
-
-      var title = document.createElement("div");
-      title.className = "bye-week-title";
-      title.textContent = "Teams on Bye";
-      section.appendChild(title);
-
-      var list = document.createElement("div");
-      list.className = "bye-week-list";
-      section.appendChild(list);
-
-      for (var j = 0; j < normalized.length; j++) {
-        var team = normalized[j];
-        var item = document.createElement("div");
-        item.className = "bye-week-team";
-        item.title = team.name;
-
+      var teams = Array.isArray(game.teams) ? game.teams : [];
+      var grid = document.createElement("div");
+      grid.className = "bye-week-logos";
+      // Two rows once there are more than three teams, so logos stay large.
+      grid.style.setProperty("--bye-columns", teams.length > 3 ? Math.ceil(teams.length / 2) : teams.length);
+      for (var i = 0; i < teams.length; i++) {
         var logo = document.createElement("img");
-        logo.className = "bye-week-team-logo";
-        logo.src = this.getLogoUrl(team.abbr);
-        logo.alt = team.abbr;
+        logo.className = "bye-week-logo";
+        logo.src = this.getLogoUrl(teams[i]);
+        logo.alt = teams[i];
+        logo.title = teams[i];
         logo.onerror = (function (imgEl) { return function () { imgEl.style.display = "none"; }; })(logo);
-        item.appendChild(logo);
-
-        var textWrap = document.createElement("div");
-        textWrap.className = "bye-week-team-text";
-
-        var abbrEl = document.createElement("span");
-        abbrEl.className = "bye-week-team-abbr";
-        abbrEl.textContent = team.abbr;
-        textWrap.appendChild(abbrEl);
-
-        if (team.name && team.name !== team.abbr) {
-          var nameEl = document.createElement("span");
-          nameEl.className = "bye-week-team-name";
-          nameEl.textContent = team.name;
-          textWrap.appendChild(nameEl);
-        }
-
-        item.appendChild(textWrap);
-        list.appendChild(item);
+        grid.appendChild(logo);
       }
-
-      return section;
+      body.appendChild(grid);
+      return card;
     },
 
     createGameBox: function (game) {
       var league = this._getLeague();
       if (league === "nhl") return this._createNhlGameCard(game);
-      if (league === "nfl") return this._createNflGameCard(game);
+      if (league === "nfl") return game && game.nflByeCell ? this._createNflByeCard(game) : this._createNflGameCard(game);
       if (league === "nba") return this._createNbaGameCard(game);
       if (league === "olympic_mhockey" || league === "olympic_whockey" || league === "worldcup") return this._createNhlGameCard(game, league);
       return this._createMlbGameCard(game);
