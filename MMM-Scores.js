@@ -2650,7 +2650,7 @@
           isLoser: isLoser,
           metrics: [],
           total: totalScore,
-          totalPlaceholder: isPreview ? "" : "—"
+          totalPlaceholder: "—"
         });
       }
 
