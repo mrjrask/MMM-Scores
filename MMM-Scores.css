@@ -134,71 +134,28 @@
 }
 
 /*--------------------------------------------------
-  NFL Bye Section
+  NFL Bye Week cell
 --------------------------------------------------*/
-.bye-week-section {
-  width: min(100%, var(--scoreboard-content-width, 100%));
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: calc(var(--matrix-gap) * 0.75);
-}
-
-.bye-week-title {
-  font-size: calc(var(--scoreboard-label-font) + 1pt);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--scoreboard-muted);
-  font-weight: 600;
-}
-
-.bye-week-list {
-  display: flex;
-  flex-wrap: wrap;
+.scoreboard-card.is-bye .scoreboard-body {
+  flex: 1 1 auto;
   justify-content: center;
-  gap: calc(var(--matrix-gap) * 0.75);
 }
 
-.bye-week-team {
-  display: flex;
+.bye-week-logos {
+  display: grid;
+  grid-template-columns: repeat(var(--bye-columns, 3), 1fr);
+  justify-items: center;
   align-items: center;
   gap: calc(var(--scoreboard-gap) * 0.75);
-  padding: calc(var(--scoreboard-pad-block) * 0.9) calc(var(--scoreboard-pad-inline) * 0.9);
-  border-radius: calc(var(--scoreboard-card-radius) * 0.6);
-  background: rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.35);
-  min-width: calc(var(--scoreboard-card-width) * 0.45);
+  padding: var(--scoreboard-pad-block) var(--scoreboard-pad-inline);
 }
 
-.bye-week-team-logo {
-  height: calc(var(--scoreboard-team-font) * 0.952);
-  width: calc(var(--scoreboard-team-font) * 1.2);
+.bye-week-logo {
+  width: 100%;
+  max-width: calc(var(--scoreboard-team-font) * 2.4);
+  height: calc(var(--scoreboard-team-font) * 1.9);
   object-fit: contain;
   display: block;
-  flex-shrink: 0;
-}
-
-.bye-week-team-text {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--scoreboard-gap) * 0.2);
-  line-height: 1.1;
-}
-
-.bye-week-team-abbr {
-  font-size: calc(var(--scoreboard-team-font) * 0.9 + 1pt);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  font-weight: 700;
-}
-
-.bye-week-team-name {
-  font-size: calc(var(--scoreboard-label-font) * 1.05 + 1pt);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--scoreboard-muted);
-  font-weight: 600;
 }
 
 /*--------------------------------------------------

@@ -22,7 +22,7 @@ A MagicMirror² module that cycles through MLB, NHL, NFL, NBA, World Cup soccer,
 ---
 
 ## Features
-- **Eight-league scoreboards**: MLB (R/H/E linescore), WBC, NHL (goals & shots), NFL (quarter-by-quarter totals plus bye list), NBA (quarter/OT breakdown), World Cup soccer (half/extra-time clocks, stoppage time, and shootout indicators), Men's Olympic Hockey, and Women's Olympic Hockey.
+- **Eight-league scoreboards**: MLB (R/H/E linescore), WBC, NHL (goals & shots), NFL (quarter-by-quarter totals plus a "BYE WEEK" cell showing the logos of teams on bye), NBA (quarter/OT breakdown), World Cup soccer (half/extra-time clocks, stoppage time, and shootout indicators), Men's Olympic Hockey, and Women's Olympic Hockey.
 - **MLB/NHL/NBA Playoff Bracket screens**: A full postseason bracket (Wild Card/Division Series/LCS/World Series for MLB; First Round through the Finals for NHL/NBA) plus a scrollable current-round series list with live status, next-game times, and series scores. See [Playoff Bracket Screens](#playoff-bracket-screens).
 - **Automatic league rotation**: Show a single league, a custom sequence, or all supported leagues with timed page flips.
 - **Flexible layout**: Control columns, rows, or total games per page per league and scale everything with a single `layoutScale` value.
