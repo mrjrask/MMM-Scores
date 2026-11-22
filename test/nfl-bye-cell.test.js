@@ -29,7 +29,7 @@ test('NFL bye teams become one extra cell after the games', () => {
   const games = inst._scoreboardGames();
   assert.equal(games.length, 2);
   assert.equal(games[1].nflByeCell, true);
-  assert.deepEqual(games[1].teams, ['DAL', 'KC']);
+  assert.deepEqual(Array.from(games[1].teams), ['DAL', 'KC']);
 
   inst.currentExtras = { teamsOnBye: [] };
   assert.equal(inst._scoreboardGames().length, 1);
