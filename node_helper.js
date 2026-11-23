@@ -7,6 +7,12 @@ const https      = require("https");
 const { URL }    = require("url");
 const LeagueConfig = require("./shared-league-config");
 const ScoreboardNormalizer = require("./scoreboard-normalizer");
+const NFL_TEAM_ABBREVIATIONS = [
+  "ARI", "ATL", "BAL", "BUF", "CAR", "CHI", "CIN", "CLE", "DAL", "DEN", "DET",
+  "GB", "HOU", "IND", "JAX", "KC", "LAC", "LAR", "LV", "MIA", "MIN", "NE", "NO",
+  "NYG", "NYJ", "PHI", "PIT", "SEA", "SF", "TB", "TEN", "WSH"
+];
+const NFL_MAX_BYE_TEAMS = 8;
 const MlbPlayoffData = require("./playoff-data-mlb");
 const NhlPlayoffData = require("./playoff-data-nhl");
 const NbaPlayoffData = require("./playoff-data-nba");
@@ -2168,7 +2174,8 @@ module.exports = NodeHelper.create({
         const games = this._finalGamesOnly(previousResults.games);
         console.log(`🏈 Sending ${games.length} NFL final games for ${context.previousDateIso} plus ${todayResults.games.length} scheduled games for ${context.todayIso}.`);
         this._notifyGames("nfl", games, {
-          teamsOnBye: previousResults.byes,
+          // A single day of games cannot show who is idle for the week.
+          teamsOnBye: [],
           scheduleGames: todayResults.games,
           showingPreviousFinals: true
         });
@@ -2228,7 +2235,7 @@ module.exports = NodeHelper.create({
         return 0;
       });
 
-      const byeList = results.byes;
+      const byeList = this._computeNflByeTeams(games);
       const range = results.range || weekRange;
 
       const extras = { teamsOnBye: byeList };
@@ -2307,6 +2314,41 @@ module.exports = NodeHelper.create({
       games,
       byes: byeList
     };
+  },
+
+  // ESPN does not publish which teams are on bye, so derive it from the week's
+  // schedule: every team that has no game. Empty outside the regular season
+  // (preseason, playoffs) and when the games look like a partial week.
+  _computeNflByeTeams(games) {
+    const aliases = { WAS: "WSH", LA: "LAR", JAC: "JAX", OAK: "LV", SD: "LAC", STL: "LAR" };
+    const playing = new Set();
+    let count = 0;
+
+    for (const game of Array.isArray(games) ? games : []) {
+      if (!game || typeof game !== "object") continue;
+      // ESPN season types: 1 preseason, 2 regular season, 3 postseason.
+      const seasonType = Number(game.season && game.season.type);
+      if (seasonType === 1 || seasonType === 3) return [];
+      count += 1;
+      const competition = game.competitions && game.competitions[0];
+      const competitors = (competition && competition.competitors) || [];
+      for (const competitor of competitors) {
+        const team = (competitor && competitor.team) || {};
+        const raw = String(team.abbreviation || "").trim().toUpperCase();
+        if (raw) playing.add(aliases[raw] || raw);
+      }
+    }
+
+    if (count === 0) return [];
+    for (const abbr of playing) {
+      if (!NFL_TEAM_ABBREVIATIONS.includes(abbr)) return [];
+    }
+
+    const byes = NFL_TEAM_ABBREVIATIONS.filter((abbr) => !playing.has(abbr));
+    // A regular-season week never idles more than a handful of teams; more
+    // means a partial schedule or the playoffs.
+    if (byes.length > NFL_MAX_BYE_TEAMS) return [];
+    return byes.map((abbr) => ({ id: abbr, abbreviation: abbr, displayName: abbr, shortDisplayName: null }));
   },
 
   _isNflProBowl(game) {
