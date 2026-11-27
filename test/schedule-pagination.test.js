@@ -66,3 +66,24 @@ test('schedule pagination is added after current scoreboard pages', () => {
   assert.equal(instance._scoreboardPageCount, 2);
   assert.equal(instance.totalGamePages, 5);
 });
+
+test('schedule pages carry their label in the module header, not an extra body line', () => {
+  const scoreGames = Array.from({ length: 3 }, (_, index) => ({ id: `score-${index}` }));
+  const scheduleGames = Array.from({ length: 8 }, (_, index) => ({ id: `schedule-${index}` }));
+  const instance = createModuleInstance({
+    config: { scoreboardColumns: 2, gamesPerColumn: 4, showTitle: true },
+    gamesByLeague: { nba: scoreGames },
+    scheduleGamesByLeague: { nba: scheduleGames }
+  });
+  instance._getLeague = () => 'nba';
+  instance._applyActiveLeagueState();
+
+  instance.currentScreen = 0;
+  assert.equal(instance.getHeader(), 'NBA Scoreboard');
+
+  instance.currentScreen = instance._scoreboardPageCount;
+  assert.equal(instance.getHeader(), "Today's NBA Schedule");
+
+  instance.config.showTitle = false;
+  assert.equal(instance.getHeader(), null);
+});

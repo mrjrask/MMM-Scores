@@ -275,6 +275,10 @@
   var SUPPORTED_LEAGUES = ["mlb", "wbc", "nhl", "nfl", "nba", "worldcup", "olympic_mhockey", "olympic_whockey"];
   var PLAYOFF_LEAGUES = ["mlb_playoffs", "nhl_playoffs", "nba_playoffs"];
   var ALL_LEAGUE_TOKENS = SUPPORTED_LEAGUES.concat(PLAYOFF_LEAGUES);
+  var SCHEDULE_HEADER_NAMES = {
+    mlb: "MLB", wbc: "WBC", nhl: "NHL", nfl: "NFL", nba: "NBA", worldcup: "World Cup",
+    olympic_mhockey: "Men's Olympic Hockey", olympic_whockey: "Women's Olympic Hockey"
+  };
   var MLB_MAX_GAMES_PER_PAGE = 8;
   var MLB_MAX_COLUMNS        = 2;
 
@@ -316,6 +320,12 @@
     getHeader: function () {
       if (!this.config.showTitle) return null;
       var league = this._getLeague();
+      // Schedule pages carry their label in the header instead of an extra body
+      // line, so they stay the same height as the scoreboard pages.
+      if (this._isSchedulePage()) {
+        var scheduleName = SCHEDULE_HEADER_NAMES[league];
+        if (scheduleName) return "Today's " + scheduleName + " Schedule";
+      }
       if (league === "mlb") return "MLB Scoreboard";
       if (league === "wbc") return "WBC Scoreboard";
       if (league === "nhl") return "NHL Scoreboard";
@@ -328,6 +338,20 @@
       if (league === "nhl_playoffs") return "NHL Playoffs";
       if (league === "nba_playoffs") return "NBA Playoffs";
       return "Scoreboard";
+    },
+
+    _isSchedulePage: function () {
+      var league = this._getLeague();
+      var scheduleGames = (this.scheduleGamesByLeague && Array.isArray(this.scheduleGamesByLeague[league]))
+        ? this.scheduleGamesByLeague[league]
+        : [];
+      if (scheduleGames.length === 0) return false;
+      var scoreboardPages = this._scoreboardPageCount || 0;
+      var screen = this.currentScreen || 0;
+      if (screen < scoreboardPages) return false;
+      var perPage = this._gamesPerPage || 0;
+      if (perPage <= 0) return false;
+      return (screen - scoreboardPages) * perPage < scheduleGames.length;
     },
 
     getScripts: function () {
@@ -1514,7 +1538,7 @@
       }
 
       if (pageGames && pageGames.length > 0) {
-        if (isSchedulePage) {
+        if (isSchedulePage && !this.config.showTitle) {
           var scheduleTitle = document.createElement("div");
           var scheduleAlignment = this._placementAlignment || this._detectPlacementAlignment(false) || "center";
           scheduleTitle.className = "small dimmed schedule-title schedule-title-" + scheduleAlignment;
